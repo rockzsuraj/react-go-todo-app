@@ -1,0 +1,7 @@
+{
+  "apps/web/src/**/*.{js,jsx,ts,tsx}": "cd apps/web && npm run check:fix",
+  "apps/api/**/*.go": [
+    "cd apps/api && go fmt ./...",
+    "cd apps/api && go build ./..."
+  ]
+}
