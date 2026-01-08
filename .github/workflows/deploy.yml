@@ -32,7 +32,8 @@ jobs:
         npm run build
       env:
         REACT_APP_API_URL: https://qnlhgaymddnazecbtsau.supabase.co/rest/v1
-        REACT_APP_SUPABASE_ANON_KEY: sb_publishable_kw655WpHOEH67cfb75d09g__KVNNChK
+        REACT_APP_SUPABASE_URL: https://qnlhgaymddnazecbtsau.supabase.co
+        REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
