@@ -4,7 +4,7 @@ metadata:
   name: todo-backend
   namespace: todo-app
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: todo-backend
@@ -15,17 +15,30 @@ spec:
     spec:
       containers:
       - name: backend
-        image: ghcr.io/suraj/react-todo-backend:3ca7add
-        imagePullPolicy: Always
+        image: BACKEND_IMAGE
         ports:
         - containerPort: 8080
         env:
-        - name: PORT
-          value: "8080"
-        - name: API_URL
-          value: "http://todo-backend-service.todo-app.svc.cluster.local"
-        - name: CORS_ORIGIN
-          value: "*"
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: todo-secrets
+              key: db-host
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: todo-secrets
+              key: db-user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: todo-secrets
+              key: db-password
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: todo-secrets
+              key: db-name
         resources:
           requests:
             memory: "64Mi"
@@ -34,14 +47,16 @@ spec:
             memory: "128Mi"
             cpu: "100m"
         livenessProbe:
-          tcpSocket:
+          httpGet:
+            path: /health
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
-          tcpSocket:
+          httpGet:
+            path: /health
             port: 8080
-          initialDelaySeconds: 10
+          initialDelaySeconds: 5
           periodSeconds: 5
 ---
 apiVersion: v1
