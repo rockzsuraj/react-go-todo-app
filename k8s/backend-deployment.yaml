@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: ghcr.io/suraj/react-todo-backend:3ca7add
+        image: ghcr.io/rockzsuraj/react-springboot-full-stack-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

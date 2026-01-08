@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ghcr.io/suraj/react-todo-frontend:3ca7add
+        image: ghcr.io/rockzsuraj/react-springboot-full-stack-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80

@@ -141,8 +141,8 @@ jobs:
     - name: Deploy to Production
       run: |
         export KUBECONFIG=kubeconfig
-        sed -i "s|FRONTEND_IMAGE|${{ needs.build-frontend.outputs.image }}|g" k8s/frontend-deployment.yaml
-        sed -i "s|BACKEND_IMAGE|${{ needs.build-backend.outputs.image }}|g" k8s/backend-deployment.yaml
+        sed -i "s|ghcr.io/rockzsuraj/react-springboot-full-stack-frontend:latest|${{ needs.build-frontend.outputs.image }}|g" k8s/frontend-deployment.yaml
+        sed -i "s|ghcr.io/rockzsuraj/react-springboot-full-stack-backend:latest|${{ needs.build-backend.outputs.image }}|g" k8s/backend-deployment.yaml
         kubectl apply -f k8s/
         kubectl rollout status deployment/todo-frontend -n todo-app
         kubectl rollout status deployment/todo-backend -n todo-app
