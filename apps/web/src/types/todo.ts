@@ -1,5 +1,5 @@
 export interface Todo {
-    rowNumber: number;
-    rowDescription: string;
-    rowAssigned: string;
+  rowNumber: number;
+  rowDescription: string;
+  rowAssigned: string;
 }
