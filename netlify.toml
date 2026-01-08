@@ -1,0 +1,13 @@
+[build]
+  base = "apps/web"
+  publish = "apps/web/build"
+  command = "npm run build"
+
+[build.environment]
+  REACT_APP_SUPABASE_URL = "https://qnlhgaymddnazecbtsau.supabase.co"
+  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubGhnYXltZGRuYXplY2J0c2F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3NzI4NzEsImV4cCI6MjA1MjM0ODg3MX0.test"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
