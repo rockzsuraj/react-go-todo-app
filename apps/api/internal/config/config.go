@@ -10,6 +10,7 @@ type DBConfig struct {
 	User     string
 	Password string
 	Name     string
+	SSLMode  string
 }
 
 func LoadDBConfig() DBConfig {
@@ -19,6 +20,7 @@ func LoadDBConfig() DBConfig {
 		User:     getEnv("DB_USER", "postgres"),
 		Password: getEnv("DB_PASSWORD", "postgres"),
 		Name:     getEnv("DB_NAME", "todos"),
+		SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 	}
 }
 
