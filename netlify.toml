@@ -5,7 +5,7 @@
 
 [build.environment]
   REACT_APP_SUPABASE_URL = "https://qnlhgaymddnazecbtsau.supabase.co"
-  REACT_APP_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubGhnYXltZGRuYXplY2J0c2F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3NzI4NzEsImV4cCI6MjA1MjM0ODg3MX0.test"
+  REACT_APP_SUPABASE_ANON_KEY = "YOUR_REAL_SUPABASE_ANON_KEY_HERE"
 
 [[redirects]]
   from = "/*"

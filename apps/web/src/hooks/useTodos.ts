@@ -10,7 +10,7 @@ export const useTodos = () => {
     },
     staleTime: 30000,
     refetchOnWindowFocus: false,
-    refetchInterval: 2000,
+    refetchInterval: false,
   });
 };
 
