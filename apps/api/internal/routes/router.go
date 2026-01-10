@@ -15,17 +15,20 @@ func SetupRouter() http.Handler {
 	r := chi.NewRouter()
 
 	// 🔒 SECURITY MIDDLEWARE (Order matters!)
-	// 1. Error handling - catch crashes first
+	// 1. CORS first - allow cross-origin requests
+	r.Use(appMiddleware.CORS())
+	
+	// 2. Error handling - catch crashes
 	r.Use(appMiddleware.ErrorHandler)
 	
-	// 2. Rate limiting - block attackers early
+	// 3. Rate limiting - block attackers early
 	rateLimiter := appMiddleware.NewRateLimiter()
 	r.Use(rateLimiter.RateLimit)
 	
-	// 3. Input validation - check for malicious content
+	// 4. Input validation - check for malicious content
 	r.Use(appMiddleware.InputValidation)
 	
-	// 4. API key authentication - control access
+	// 5. API key authentication - control access
 	r.Use(appMiddleware.APIKeyAuth)
 
 	// Production middleware
@@ -35,9 +38,6 @@ func SetupRouter() http.Handler {
 	r.Use(appMiddleware.SecurityHeaders)
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(middleware.Compress(5))
-
-	// CORS for frontend access
-	r.Use(appMiddleware.CORS())
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
