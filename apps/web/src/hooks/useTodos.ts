@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { todoApi, type Todo } from '../api/supabase';
+import { todoApi, type Todo } from '../api/todoApi';
 
 export const useTodos = () => {
   return useQuery({
