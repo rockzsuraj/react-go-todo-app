@@ -20,13 +20,13 @@ func APIKeyAuth(next http.Handler) http.Handler {
 		
 		// Check if API key is provided
 		if apiKey == "" {
-			SendErrorResponse(w, "API key required", http.StatusUnauthorized)
+			sendAuthError(w, "API key required", http.StatusUnauthorized)
 			return
 		}
 		
 		// Validate the API key
 		if !isValidAPIKey(apiKey) {
-			SendErrorResponse(w, "Invalid API key", http.StatusUnauthorized)
+			sendAuthError(w, "Invalid API key", http.StatusUnauthorized)
 			return
 		}
 		
@@ -57,19 +57,9 @@ func isValidAPIKey(key string) bool {
 	return false // No matching key found
 }
 
-// Helper function for error responses (reuse from errors.go)
-func SendErrorResponse(w http.ResponseWriter, message string, statusCode int) {
+// Helper function for error responses (uses the one from errors.go)
+func sendAuthError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	
-	response := struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error"`
-	}{
-		Success: false,
-		Error:   message,
-	}
-	
-	// Simple JSON response without importing encoding/json
 	w.Write([]byte(`{"success":false,"error":"` + message + `"}`))
 }

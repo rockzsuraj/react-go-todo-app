@@ -6,6 +6,7 @@ export const apiClient = axios.create({
   timeout: 5000,
   headers: {
     'Content-Type': 'application/json',
+    'X-API-Key': process.env.REACT_APP_API_KEY || 'dev-key-12345',
   },
 });
 

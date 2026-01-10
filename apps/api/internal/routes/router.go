@@ -3,7 +3,6 @@ package routes
 import (
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 	"react-todos/apps/api/internal/handlers"
 	appMiddleware "react-todos/apps/api/internal/middleware"
