@@ -1,3 +1,7 @@
+#
+apps/api/tmp
+apps/web/build
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -33,6 +37,9 @@ docker-compose.override.yml
 *.out
 go.work
 vendor/
+# Ignore local build artifacts for apps/api
+apps/api/main
+apps/api/server
 
 # Logs
 *.log
@@ -68,3 +75,8 @@ pids
 *.pid
 *.seed
 *.pid.lock
+
+.env*
+!.env.example
+node_modules
+dist
