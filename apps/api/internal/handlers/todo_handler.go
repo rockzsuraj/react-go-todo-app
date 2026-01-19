@@ -2,226 +2,219 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"react-todos/apps/api/internal/dto"
-	"react-todos/apps/api/internal/models"
-	"react-todos/apps/api/internal/services"
 	"strconv"
-	"strings"
+
+	"react-todos/apps/api/internal/dto"
+	"react-todos/apps/api/internal/middleware"
+	"react-todos/apps/api/internal/services"
+	"react-todos/apps/api/internal/utils"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
-var todoService *services.TodoService
+/*
+|--------------------------------------------------------------------------
+| Init
+|--------------------------------------------------------------------------
+*/
 
-func InitHandlers(service *services.TodoService) {
+var todoService services.TodoServicer
+
+func InitHandlers(service services.TodoServicer) {
 	todoService = service
 }
 
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
+func getUserUUID(r *http.Request) (uuid.UUID, error) {
+	userIDStr := middleware.UserIDFromContext(r.Context())
+	return uuid.Parse(userIDStr)
+}
+
+/*
+|--------------------------------------------------------------------------
+| Handlers
+|--------------------------------------------------------------------------
+*/
+
+/*
+GET /api/todos
+*/
 func GetTodos(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	
-	todos, err := todoService.GetAll(r.Context())
+	userID, err := getUserUUID(r)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"FETCH_TODOS_ERROR",
-			"Failed to fetch todos",
-			err.Error(),
-		))
+		middleware.SendError(w, err)
 		return
 	}
-	
-	response := make([]dto.TodoResponse, len(todos))
-	for i, todo := range todos {
-		response[i] = dto.TodoResponse{
-			ID:          todo.ID,
-			Description: todo.Description,
-			Assigned:    todo.Assigned,
+
+	// Parse pagination query params (page, limit)
+	page := 1
+	limit := 25
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
 		}
 	}
-	
-	meta := &dto.Meta{
-		Total: len(response),
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
 	}
-	
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(dto.SuccessResponseWithMeta(response, meta))
+
+	offset := (page - 1) * limit
+
+	todos, total, err := todoService.GetAll(r.Context(), userID, limit, offset)
+	if err != nil {
+		middleware.SendError(w, err)
+		return
+	}
+
+	// Map to response DTOs and ensure we return an empty array (not null)
+	resp := make([]dto.TodoResponse, 0, len(todos))
+	for _, t := range todos {
+		resp = append(resp, dto.TodoResponse{
+			ID:             t.ID,
+			Description:    t.Description,
+			AssignedToName: t.AssignedToName,
+			Completed:      t.Completed,
+			CreatedAt:      t.CreatedAt,
+			UpdatedAt:      t.UpdatedAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	meta := &dto.Meta{Total: total, Page: page, Limit: limit, Offset: offset}
+	_ = json.NewEncoder(w).Encode(dto.SuccessResponseWithMeta(resp, meta))
 }
 
+/*
+POST /api/todos
+Body: { "description": "Buy milk" }
+*/
 func CreateTodoHandler(w http.ResponseWriter, r *http.Request) {
+	userID, err := getUserUUID(r)
+	if err != nil {
+		middleware.SendError(w, err)
+		return
+	}
+
+	var body dto.CreateTodoRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		middleware.SendError(w, err)
+		return
+	}
+
+	if err := utils.ValidateStruct(body); err != nil {
+		middleware.SendValidationError(w, err)
+		return
+	}
+
+	if err := todoService.Create(
+		r.Context(),
+		userID,
+		body.AssignedToName,
+		body.Description,
+	); err != nil {
+		middleware.SendError(w, err)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	
-	var req dto.CreateTodoRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"INVALID_REQUEST_BODY",
-			"Invalid request body format",
-			err.Error(),
-		))
-		return
-	}
-
-	// 🔒 FIELD VALIDATION
-	if err := validateTodoFields(req.Description, req.Assigned); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"VALIDATION_ERROR",
-			"Invalid field values",
-			err.Error(),
-		))
-		return
-	}
-
-	todo := models.Todo{
-		Description: req.Description,
-		Assigned:    req.Assigned,
-	}
-
-	if err := todoService.Create(r.Context(), todo); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"CREATE_TODO_ERROR",
-			"Failed to create todo",
-			err.Error(),
-		))
-		return
-	}
-
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(dto.SuccessResponse(map[string]string{
-		"message": "Todo created successfully",
-	}))
+	_ = json.NewEncoder(w).Encode(dto.SuccessResponse(nil))
 }
 
+/*
+PUT /api/todos/{id}
+Body: { "description": "...", "completed": true }
+*/
 func UpdateTodoHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idStr)
+	userID, err := getUserUUID(r)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"INVALID_TODO_ID",
-			"Invalid todo ID format",
-			"ID must be a valid integer",
-		))
+		middleware.SendError(w, err)
 		return
 	}
 
-	var req dto.UpdateTodoRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"INVALID_REQUEST_BODY",
-			"Invalid request body format",
-			err.Error(),
-		))
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		middleware.SendError(w, err)
 		return
 	}
 
-	todo := models.Todo{
-		Description: req.Description,
-		Assigned:    req.Assigned,
-	}
+	var body dto.UpdateTodoRequest
 
-	if err := todoService.Update(r.Context(), id, todo); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"UPDATE_TODO_ERROR",
-			"Failed to update todo",
-			err.Error(),
-		))
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		middleware.SendError(w, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(dto.SuccessResponse(map[string]string{
-		"message": "Todo updated successfully",
-	}))
+	if err := utils.ValidateStruct(body); err != nil {
+		middleware.SendValidationError(w, err)
+		return
+	}
+
+	// Provide sensible defaults if fields are nil when calling service
+	desc := ""
+	if body.Description != nil {
+		desc = *body.Description
+	}
+	assignedToName := ""
+	if body.AssignedToName != nil {
+		assignedToName = *body.AssignedToName
+	}
+	completed := false
+	if body.Completed != nil {
+		completed = *body.Completed
+	}
+
+	if err := todoService.Update(
+		r.Context(),
+		userID,
+		id,
+		assignedToName,
+		desc,
+		completed,
+	); err != nil {
+		middleware.SendError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNoContent)
 }
 
+/*
+DELETE /api/todos/{id}
+*/
 func DeleteTodoHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idStr)
+	userID, err := getUserUUID(r)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"INVALID_TODO_ID",
-			"Invalid todo ID format",
-			"ID must be a valid integer",
-		))
+		middleware.SendError(w, err)
 		return
 	}
 
-	if err := todoService.Delete(r.Context(), id); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(dto.ErrorResponse(
-			"DELETE_TODO_ERROR",
-			"Failed to delete todo",
-			err.Error(),
-		))
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		middleware.SendError(w, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(dto.SuccessResponse(map[string]string{
-		"message": "Todo deleted successfully",
-	}))
-}
+	if err := todoService.Delete(
+		r.Context(),
+		userID,
+		id,
+	); err != nil {
+		middleware.SendError(w, err)
+		return
+	}
 
-// 🔒 FIELD VALIDATION FUNCTIONS
-func validateTodoFields(description, assigned string) error {
-	// Check if fields are empty
-	if description == "" {
-		return fmt.Errorf("description is required")
-	}
-	if assigned == "" {
-		return fmt.Errorf("assigned field is required")
-	}
-	
-	// Check field lengths
-	if len(description) < 3 {
-		return fmt.Errorf("description must be at least 3 characters")
-	}
-	if len(description) > 500 {
-		return fmt.Errorf("description must be less than 500 characters")
-	}
-	if len(assigned) < 2 {
-		return fmt.Errorf("assigned must be at least 2 characters")
-	}
-	if len(assigned) > 100 {
-		return fmt.Errorf("assigned must be less than 100 characters")
-	}
-	
-	// Check for malicious content
-	if containsMaliciousContent(description) {
-		return fmt.Errorf("description contains invalid characters")
-	}
-	if containsMaliciousContent(assigned) {
-		return fmt.Errorf("assigned contains invalid characters")
-	}
-	
-	return nil
-}
-
-func containsMaliciousContent(input string) bool {
-	// Check for script tags and SQL injection
-	dangerous := []string{
-		"<script", "</script>", "javascript:", "<iframe",
-		"SELECT", "INSERT", "DELETE", "UPDATE", "DROP",
-		"UNION", "--", "/*", "*/", ";",
-	}
-	
-	lower := strings.ToLower(input)
-	for _, pattern := range dangerous {
-		if strings.Contains(lower, strings.ToLower(pattern)) {
-			return true
-		}
-	}
-	return false
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNoContent)
 }

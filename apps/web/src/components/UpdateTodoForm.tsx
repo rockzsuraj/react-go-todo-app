@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useUpdateTodo } from '../hooks/useTodos';
-import { Todo } from '../api/supabase';
+import type { TodoEditable } from '../types/todo';
 
 interface Props {
-  todo: Todo;
+  todo: TodoEditable;
   onCancel: () => void;
 }
 
 function UpdateTodoForm({ todo, onCancel }: Props) {
   const [description, setDescription] = useState(todo.description);
-  const [assigned, setAssigned] = useState(todo.assigned);
+  const [assigned, setAssigned] = useState(todo.assigned_to_name);
   const updateTodoMutation = useUpdateTodo();
 
   function handleChangeDescription(event: { target: { value: string } }) {
@@ -20,18 +20,24 @@ function UpdateTodoForm({ todo, onCancel }: Props) {
     setAssigned(event.target.value);
   }
 
-  function submitUpdate() {
-    if (description !== '' && assigned !== '') {
-      updateTodoMutation.mutate(
-        { id: todo.id, todo: { description, assigned } },
-        {
-          onSuccess: () => {
-            onCancel();
-          },
-        }
-      );
-    }
+function submitUpdate() {
+  if (description !== '' && assigned !== '') {
+    updateTodoMutation.mutate(
+      {
+        id: todo.id,
+        payload: {
+          description,
+          assigned_to_name: assigned,
+        },
+      },
+      {
+        onSuccess: () => {
+          onCancel();
+        },
+      }
+    );
   }
+}
 
   return (
     <div className="mt-3 p-3 border rounded">

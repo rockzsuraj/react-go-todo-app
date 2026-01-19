@@ -1,12 +1,13 @@
-import { Todo } from '../api/supabase';
 import TodoRowItem from './TodoRowItem';
+import type { Todo } from '../types/todo';
 
 interface Props {
   todos: Todo[];
   deleteTodo: (id: number) => void;
+  isDeleting?: boolean;
 }
 
-function TodoTable(props: Props) {
+function TodoTable({ todos, deleteTodo, isDeleting = false }: Props) {
   return (
     <table className="table table-hover">
       <thead>
@@ -17,14 +18,16 @@ function TodoTable(props: Props) {
           <th>Delete</th>
         </tr>
       </thead>
+
       <tbody>
-        {props.todos.map((todo) => (
+        {todos.map((todo) => (
           <TodoRowItem
             key={todo.id}
             rowNumber={todo.id}
             rowDescription={todo.description}
-            rowAssigned={todo.assigned}
-            deleteTodo={props.deleteTodo}
+            rowAssigned={todo.assigned_to_name}
+            deleteTodo={deleteTodo}
+            isDeleting={isDeleting} // ✅ now valid
           />
         ))}
       </tbody>

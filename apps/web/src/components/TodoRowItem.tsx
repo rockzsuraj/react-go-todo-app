@@ -1,22 +1,28 @@
 import { useState } from 'react';
 import UpdateTodoForm from './UpdateTodoForm';
-import { Todo } from '../api/supabase';
+import type { TodoEditable } from '../types/todo';
 
 interface Props {
   rowNumber: number;
   rowDescription: string;
   rowAssigned: string;
   deleteTodo: (id: number) => void;
+  isDeleting?: boolean; // ✅ add
 }
 
-function TodoRowItem(props: Props) {
-  const { rowNumber, rowDescription, rowAssigned, deleteTodo } = props;
+function TodoRowItem({
+  rowNumber,
+  rowDescription,
+  rowAssigned,
+  deleteTodo,
+  isDeleting = false,
+}: Props) {
   const [isEditing, setIsEditing] = useState(false);
-  
-  const todo: Todo = {
+
+  const todo: TodoEditable = {
     id: rowNumber,
     description: rowDescription,
-    assigned: rowAssigned,
+    assigned_to_name: rowAssigned,
   };
 
   return (
@@ -30,26 +36,30 @@ function TodoRowItem(props: Props) {
             <button
               type="button"
               className="btn btn-outline-primary btn-sm"
-              onClick={() => setIsEditing(!isEditing)}
+              disabled={isDeleting}
+              onClick={() => setIsEditing((v) => !v)}
             >
               {isEditing ? 'Cancel' : 'Edit'}
             </button>
+
             <button
               type="button"
               onClick={() => deleteTodo(rowNumber)}
               className="btn btn-danger btn-sm"
+              disabled={isDeleting}
             >
-              X
+              {isDeleting ? '...' : 'X'}
             </button>
           </div>
         </td>
       </tr>
+
       {isEditing && (
         <tr>
           <td colSpan={4}>
-            <UpdateTodoForm 
-              todo={todo} 
-              onCancel={() => setIsEditing(false)} 
+            <UpdateTodoForm
+              todo={todo}
+              onCancel={() => setIsEditing(false)}
             />
           </td>
         </tr>

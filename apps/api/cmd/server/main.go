@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
-	"time"
 	"react-todos/apps/api/internal/config"
 	"react-todos/apps/api/internal/db"
 	"react-todos/apps/api/internal/handlers"
 	"react-todos/apps/api/internal/repository"
 	"react-todos/apps/api/internal/routes"
 	"react-todos/apps/api/internal/services"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -27,45 +27,55 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// Load configuration
-	cfg := config.LoadDBConfig()
-	port := getEnv("PORT", "8080")
+	// Load config
+	dbCfg := config.LoadDBConfig()
+	port := config.GetEnv("PORT", "8080")
 
-	// Initialize database with context
-	database := db.NewPostgresDB(cfg)
+	// Database
+	database := db.NewPostgresDB(dbCfg)
 	defer database.Close()
 
-	// Initialize repository, service and handlers
+	// Repositories
 	todoRepo := repository.NewTodoRepository(database)
+	userRepo := repository.NewUserRepository(database)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
+
+	// Services
 	todoService := services.NewTodoService(todoRepo)
+	authService := services.NewAuthService(userRepo, refreshTokenRepo)
+
+	// Handlers (INIT ONCE)
 	handlers.InitHandlers(todoService)
+	handlers.InitAuthHandlers(authService)
 
-	// Setup routes with middleware
-	r := routes.SetupRouter()
+	// Router
+	router := routes.SetupRouter()
 
-	// Create server with timeouts
+	// HTTP server
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      r,
+		Handler:      router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	logger.Info("server starting", "port", port, "env", getEnv("ENV", "development"))
+	logger.Info("server starting",
+		"port", port,
+		"env", config.GetEnv("ENV", "development"),
+	)
 
-	// Start server in goroutine
+	// Start server
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("server failed to start", "error", err)
+			logger.Error("server failed", "error", err)
 			os.Exit(1)
 		}
 	}()
 
-	// Wait for interrupt signal
+	// Wait for shutdown signal
 	<-ctx.Done()
 
-	// Graceful shutdown
 	logger.Info("shutting down server")
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
@@ -76,11 +86,4 @@ func main() {
 	}
 
 	logger.Info("server stopped gracefully")
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }

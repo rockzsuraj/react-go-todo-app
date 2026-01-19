@@ -8,15 +8,15 @@ import (
 
 func CORS() func(http.Handler) http.Handler {
 	return cors.Handler(cors.Options{
-		AllowedOrigins:   []string{
+		// Restrict to explicit origins when sending credentials.
+		AllowedOrigins: []string{
 			"http://localhost:3000",
 			"https://react-springboot-full-stack.onrender.com",
-			"*", // Allow all origins for now
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-API-Key"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-API-Key", "Cookie"},
 		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: false, // Set to false when using wildcard origin
+		AllowCredentials: true,
 		MaxAge:           300,
 	})
 }

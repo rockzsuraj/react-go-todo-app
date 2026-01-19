@@ -5,6 +5,10 @@ import (
 )
 
 type DBConfig struct {
+	// Preferred (industry standard)
+	DatabaseURL string
+
+	// Fallback (legacy / dev)
 	Host     string
 	Port     string
 	User     string
@@ -13,20 +17,46 @@ type DBConfig struct {
 	SSLMode  string
 }
 
-func LoadDBConfig() DBConfig {
-	return DBConfig{
-		Host:     getEnv("DB_HOST", "localhost"),
-		Port:     getEnv("DB_PORT", "5432"),
-		User:     getEnv("DB_USER", "postgres"),
-		Password: getEnv("DB_PASSWORD", "postgres"),
-		Name:     getEnv("DB_NAME", "todos"),
-		SSLMode:  getEnv("DB_SSL_MODE", "disable"),
-	}
-}
-
-func getEnv(key, fallback string) string {
+func GetEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
 	return fallback
+}
+
+func LoadDBConfig() DBConfig {
+	return DBConfig{
+		// ✅ Primary (Render / prod / modern)
+		DatabaseURL: os.Getenv("DATABASE_URL"),
+
+		// 🔁 Fallback (local / legacy)
+		Host:     GetEnv("DB_HOST", "localhost"),
+		Port:     GetEnv("DB_PORT", "5432"),
+		User:     GetEnv("DB_USER", "postgres"),
+		Password: GetEnv("DB_PASSWORD", "postgres"),
+		Name:     GetEnv("DB_NAME", "todos"),
+		SSLMode:  GetEnv("DB_SSL_MODE", "disable"),
+	}
+}
+
+// AppConfig holds application-level configuration such as OAuth and JWT settings.
+type AppConfig struct {
+	Env                string
+	Port               string
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
+	JWTSecret          string
+}
+
+// LoadAppConfig loads non-DB related configuration from environment variables.
+func LoadAppConfig() AppConfig {
+	return AppConfig{
+		Env:                GetEnv("ENV", "development"),
+		Port:               GetEnv("PORT", "8080"),
+		GoogleClientID:     GetEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret: GetEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", "http://localhost:8080/api/auth/google/callback"),
+		JWTSecret:          GetEnv("JWT_SECRET", "dev-jwt-secret"),
+	}
 }

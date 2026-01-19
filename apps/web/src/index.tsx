@@ -7,7 +7,7 @@ import App from './App';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 3,
+      retry: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },

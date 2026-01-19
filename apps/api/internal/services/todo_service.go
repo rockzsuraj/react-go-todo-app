@@ -3,9 +3,12 @@ package services
 import (
 	"context"
 	"errors"
+	"time"
+
 	"react-todos/apps/api/internal/models"
 	"react-todos/apps/api/internal/repository"
-	"time"
+
+	"github.com/google/uuid"
 )
 
 type TodoService struct {
@@ -16,44 +19,86 @@ func NewTodoService(repo *repository.TodoRepository) *TodoService {
 	return &TodoService{repo: repo}
 }
 
-func (s *TodoService) GetAll(ctx context.Context) ([]models.Todo, error) {
+/*
+GET
+*/
+func (s *TodoService) GetAll(
+	ctx context.Context,
+	userID uuid.UUID,
+	limit, offset int,
+) ([]models.Todo, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	
-	return s.repo.GetAll(ctx)
+
+	return s.repo.GetAllByUser(ctx, userID, limit, offset)
 }
 
-func (s *TodoService) Create(ctx context.Context, todo models.Todo) error {
-	if todo.Description == "" {
+/*
+CREATE
+*/
+func (s *TodoService) Create(
+	ctx context.Context,
+	userID uuid.UUID,
+	assignedToName string,
+	description string,
+) error {
+	if description == "" {
 		return errors.New("description is required")
 	}
-	if todo.Assigned == "" {
-		return errors.New("assigned person is required")
-	}
-	
+
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	
-	return s.repo.Create(ctx, todo)
+
+	return s.repo.Create(ctx, models.Todo{
+		UserID:         userID,
+		AssignedToName: assignedToName,
+		Description:    description,
+	})
 }
 
-func (s *TodoService) Update(ctx context.Context, id int, todo models.Todo) error {
-	if todo.Description == "" {
+/*
+UPDATE
+*/
+func (s *TodoService) Update(
+	ctx context.Context,
+	userID uuid.UUID,
+	id int,
+	assignedToName string,
+	description string,
+	completed bool,
+) error {
+	if assignedToName == "" {
+		return errors.New("assigned_to_name is required")
+	}
+	if description == "" {
 		return errors.New("description is required")
 	}
-	if todo.Assigned == "" {
-		return errors.New("assigned person is required")
-	}
-	
+
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	
-	return s.repo.Update(ctx, id, todo)
+
+	return s.repo.Update(
+		ctx,
+		id,
+		userID,
+		models.Todo{
+			AssignedToName: assignedToName,
+			Description:    description,
+			Completed:      completed,
+		},
+	)
 }
 
-func (s *TodoService) Delete(ctx context.Context, id int) error {
+/*
+DELETE
+*/
+func (s *TodoService) Delete(
+	ctx context.Context,
+	userID uuid.UUID,
+	id int,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	
-	return s.repo.Delete(ctx, id)
+
+	return s.repo.Delete(ctx, id, userID)
 }

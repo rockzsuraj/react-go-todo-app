@@ -1,24 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { todoApi, type Todo } from '../api/todoApi';
+import type { CreateTodoInput, Todo } from '../types/todo';
+import { todoApi } from '../api';
 
-export const useTodos = () => {
-  return useQuery({
-    queryKey: ['todos'],
+export const useTodos = (enabled: boolean, page = 1, limit = 10) =>
+  useQuery({
+    queryKey: ['todos', page, limit],
     queryFn: async () => {
-      const response = await todoApi.getAll();
-      return response.data.data;
+      const res = await todoApi.getAll({ page, limit });
+      return {
+        todos: (res.data?.data as Todo[]) ?? [],
+        meta: res.data?.meta,
+      };
     },
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
-    refetchInterval: false,
+    enabled,
   });
-};
 
 export const useCreateTodo = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (todo: Omit<Todo, 'id'>) => todoApi.create(todo),
+    mutationFn: (payload: CreateTodoInput) =>
+      todoApi.create(payload),
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
     },
@@ -27,10 +30,11 @@ export const useCreateTodo = () => {
 
 export const useUpdateTodo = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, todo }: { id: number; todo: Omit<Todo, 'id'> }) => 
-      todoApi.update(id, todo),
+    mutationFn: ({ id, payload }: { id: number; payload: CreateTodoInput }) =>
+      todoApi.update(id, payload),
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
     },
@@ -39,9 +43,10 @@ export const useUpdateTodo = () => {
 
 export const useDeleteTodo = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: number) => todoApi.delete(id),
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
     },

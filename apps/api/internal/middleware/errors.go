@@ -2,66 +2,76 @@ package middleware
 
 import (
 	"encoding/json"
-	"log"
+	"errors"
 	"net/http"
 	"os"
 	"runtime/debug"
+
+	"log/slog"
+
+	"react-todos/apps/api/internal/dto"
+	"react-todos/apps/api/internal/repository"
 )
 
 // Standard error response format
-type ErrorResponse struct {
-	Success   bool   `json:"success"`
-	Error     string `json:"error"`
-	Timestamp string `json:"timestamp"`
-}
-
 // Error handling middleware - catches panics and hides sensitive info
 func ErrorHandler(next http.Handler) http.Handler {
+	logger := slog.Default()
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Catch any panics (crashes) that happen
 		defer func() {
 			if err := recover(); err != nil {
-				// Log the real error for developers (in server logs)
-				log.Printf("PANIC: %v", err)
-				log.Printf("Stack trace: %s", debug.Stack())
-				
-				// Send safe error to user (no technical details)
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError)
-				
-				// Create safe error response
-				response := ErrorResponse{
-					Success:   false,
-					Error:     "Internal server error",
-					Timestamp: "2026-01-10T07:00:00Z",
-				}
-				
-				// Only show details in development (not production)
-				if os.Getenv("ENV") == "development" {
-					response.Error = "Server error - check logs for details"
-				}
-				
-				// Send JSON response
-				json.NewEncoder(w).Encode(response)
-				return
+				// 🔴 Log real error (server-side only)
+				logger.Error(
+					"panic recovered",
+					"error", err,
+					"stack", string(debug.Stack()),
+				)
+
+				sendJSONError(
+					w,
+					http.StatusInternalServerError,
+					"Internal server error",
+				)
 			}
 		}()
-		
-		// Continue to next handler
+
 		next.ServeHTTP(w, r)
 	})
 }
 
-// Custom error response helper
-func SendErrorResponse(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	
-	response := ErrorResponse{
-		Success:   false,
-		Error:     message,
-		Timestamp: "2026-01-10T07:00:00Z",
+// SendError maps domain errors → HTTP responses
+func SendError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrUnauthorized):
+		sendJSONError(w, http.StatusUnauthorized, "Unauthorized")
+
+	case errors.Is(err, repository.ErrNotFoundOrForbidden):
+		sendJSONError(w, http.StatusNotFound, "Resource not found")
+
+	default:
+		sendJSONError(w, http.StatusInternalServerError, safeMessage())
 	}
-	
-	json.NewEncoder(w).Encode(response)
+}
+
+// Low-level JSON error sender
+func sendJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	apiErr := dto.ErrorResponse("ERR_GENERIC", message, "")
+	_ = json.NewEncoder(w).Encode(apiErr)
+}
+
+// Environment-aware error message
+func safeMessage() string {
+	if os.Getenv("ENV") == "development" {
+		return "Server error (check logs)"
+	}
+	return "Internal server error"
+}
+
+// Validation error response helper
+func SendValidationError(w http.ResponseWriter, err error) {
+	sendJSONError(w, http.StatusBadRequest, "Validation validation failed: "+err.Error())
 }

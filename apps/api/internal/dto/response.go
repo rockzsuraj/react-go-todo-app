@@ -17,7 +17,7 @@ type APIError struct {
 }
 
 type Meta struct {
-	Total  int `json:"total,omitempty"`
+	Total  int `json:"total"`
 	Page   int `json:"page,omitempty"`
 	Limit  int `json:"limit,omitempty"`
 	Offset int `json:"offset,omitempty"`

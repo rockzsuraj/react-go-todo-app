@@ -1,69 +1,70 @@
 import { useState } from 'react';
 import { useCreateTodo } from '../hooks/useTodos';
 
-function NewTodoForm() {
+function NewTodoForm({ onSuccess }: { onSuccess?: () => void }) {
   const [description, setDescription] = useState('');
-  const [assigned, setAssigned] = useState('');
+  const [assignedToName, setAssignedToName] = useState('');
+
   const createTodoMutation = useCreateTodo();
 
-  function handleChangeDescription(event: { target: { value: string } }) {
-    setDescription(event.target.value);
-  }
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
 
-  function handleChangeAssigned(event: { target: { value: string } }) {
-    setAssigned(event.target.value);
-  }
+    if (!description.trim() || !assignedToName.trim()) return;
 
-  function submitTodo() {
-    if (description !== '' && assigned !== '') {
-      createTodoMutation.mutate(
-        { description, assigned },
-        {
-          onSuccess: () => {
-            setAssigned('');
-            setDescription('');
-          },
-        }
-      );
-    }
+    createTodoMutation.mutate(
+      {
+        description,
+        assigned_to_name: assignedToName,
+      },
+      {
+        onSuccess: () => {
+          setDescription('');
+          setAssignedToName('');
+          if (onSuccess) onSuccess();
+        },
+      }
+    );
   }
 
   return (
     <div className="mt-5">
-      <form onSubmit={submitTodo}>
+      <form onSubmit={handleSubmit}>
         <div className="mb-3">
           <label htmlFor="assigned" className="form-label">
-            Assigned
+            Assigned To
           </label>
           <input
             id="assigned"
-            value={assigned}
             type="text"
             className="form-control"
+            value={assignedToName}
             required
-            onChange={handleChangeAssigned}
+            onChange={(e) => setAssignedToName(e.target.value)}
+            placeholder="e.g. Mom, Dad, John"
           />
         </div>
+
         <div className="mb-3">
           <label htmlFor="description" className="form-label">
             Description
           </label>
           <textarea
             id="description"
-            value={description}
             rows={3}
             className="form-control"
+            value={description}
             required
-            onChange={handleChangeDescription}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </div>
+
         <button
-          onClick={submitTodo}
-          type="button"
+          type="submit"
           className="btn btn-primary mt-3"
           disabled={createTodoMutation.isPending}
         >
-          {createTodoMutation.isPending ? 'Adding...' : 'Add Todo'}
+          {createTodoMutation.isPending ? 'Adding…' : 'Add Todo'}
         </button>
       </form>
     </div>
