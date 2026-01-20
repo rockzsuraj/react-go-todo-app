@@ -19,7 +19,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: docker/backend.dev.Dockerfile
+      dockerfile: apps/api/backend.dev.Dockerfile
     ports:
       - "8080:8080"
     env_file:
@@ -34,7 +34,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: docker/frontend.Dockerfile
+      dockerfile: apps/web/frontend.Dockerfile
     ports:
       - "3000:3000"
     volumes:
