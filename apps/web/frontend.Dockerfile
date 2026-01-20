@@ -1,15 +1,17 @@
-FROM node:20-alpine
+# Multi-stage build for production
+FROM node:20-alpine AS builder
 
 WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts
 
-# Install deps first (cache-friendly)
-COPY apps/web/package.json apps/web/package-lock.json* ./
-RUN npm install
-
-# Copy frontend source
-COPY apps/web .
-
+COPY . .
+ARG REACT_APP_API_URL
 RUN npm run build
 
-EXPOSE 3000
-CMD ["npm", "start"]
+# Production stage
+FROM nginx:alpine
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
