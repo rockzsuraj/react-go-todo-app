@@ -49,7 +49,7 @@ func TestGetTodos(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/api/todos", nil)
 
 	// Mock middleware context
-	ctx := context.WithValue(req.Context(), middleware.UserIDKey, userID.String())
+	ctx := middleware.WithUserID(req.Context(), userID.String())
 	req = req.WithContext(ctx)
 
 	// Mock Service
@@ -100,7 +100,7 @@ func TestCreateTodo_Validation(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/api/todos", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	ctx := context.WithValue(req.Context(), middleware.UserIDKey, userID.String())
+	ctx := middleware.WithUserID(req.Context(), userID.String())
 	req = req.WithContext(ctx)
 
 	// Mock Service (should not be called)

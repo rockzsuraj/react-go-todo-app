@@ -28,6 +28,7 @@ function submitUpdate() {
         payload: {
           description,
           assigned_to_name: assigned,
+          completed: todo.completed,
         },
       },
       {

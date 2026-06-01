@@ -13,15 +13,19 @@ import (
 	"react-todos/apps/api/internal/repository"
 )
 
-// Standard error response format
-// Error handling middleware - catches panics and hides sensitive info
+// ErrUnauthorized is a standard error used by AuthMiddleware
+var ErrUnauthorized = errors.New("unauthorized")
+
+// ErrForbidden is used for admin/permission checks
+var ErrForbidden = errors.New("forbidden")
+
+// ErrorHandler catches panics to prevent the server from crashing and hides sensitive info
 func ErrorHandler(next http.Handler) http.Handler {
 	logger := slog.Default()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				// 🔴 Log real error (server-side only)
 				logger.Error(
 					"panic recovered",
 					"error", err,
@@ -31,6 +35,7 @@ func ErrorHandler(next http.Handler) http.Handler {
 				sendJSONError(
 					w,
 					http.StatusInternalServerError,
+					"ERR_INTERNAL",
 					"Internal server error",
 				)
 			}
@@ -40,30 +45,36 @@ func ErrorHandler(next http.Handler) http.Handler {
 	})
 }
 
-// SendError maps domain errors → HTTP responses
+// SendError maps domain/auth errors to standardized HTTP responses
 func SendError(w http.ResponseWriter, err error) {
 	switch {
+	// Matches the error returned by AuthMiddleware
 	case errors.Is(err, ErrUnauthorized):
-		sendJSONError(w, http.StatusUnauthorized, "Unauthorized")
+		sendJSONError(w, http.StatusUnauthorized, "ERR_UNAUTHORIZED", "Unauthorized")
 
+	// Admin/permission denied
+	case errors.Is(err, ErrForbidden):
+		sendJSONError(w, http.StatusForbidden, "ERR_FORBIDDEN", "Forbidden")
+
+	// Matches database/repository errors
 	case errors.Is(err, repository.ErrNotFoundOrForbidden):
-		sendJSONError(w, http.StatusNotFound, "Resource not found")
+		sendJSONError(w, http.StatusNotFound, "ERR_NOT_FOUND", "Resource not found")
 
 	default:
-		sendJSONError(w, http.StatusInternalServerError, safeMessage())
+		sendJSONError(w, http.StatusInternalServerError, "ERR_INTERNAL", safeMessage())
 	}
 }
 
-// Low-level JSON error sender
-func sendJSONError(w http.ResponseWriter, status int, message string) {
+// sendJSONError is the low-level helper for formatting JSON responses
+func sendJSONError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
-	apiErr := dto.ErrorResponse("ERR_GENERIC", message, "")
+	// Ensure your dto.ErrorResponse matches your frontend expectations
+	apiErr := dto.ErrorResponse(code, message, "")
 	_ = json.NewEncoder(w).Encode(apiErr)
 }
 
-// Environment-aware error message
 func safeMessage() string {
 	if os.Getenv("ENV") == "development" {
 		return "Server error (check logs)"
@@ -71,7 +82,11 @@ func safeMessage() string {
 	return "Internal server error"
 }
 
-// Validation error response helper
 func SendValidationError(w http.ResponseWriter, err error) {
-	sendJSONError(w, http.StatusBadRequest, "Validation validation failed: "+err.Error())
+	sendJSONError(w, http.StatusBadRequest, "ERR_VALIDATION", "Validation failed: "+err.Error())
+}
+
+// SendJSONErrorWithCode allows sending custom error codes
+func SendJSONErrorWithCode(w http.ResponseWriter, status int, code, message string) {
+	sendJSONError(w, status, code, message)
 }

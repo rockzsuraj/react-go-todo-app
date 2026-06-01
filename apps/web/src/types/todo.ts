@@ -12,4 +12,10 @@ export interface CreateTodoInput {
   assigned_to_name: string;
 }
 
-export type TodoEditable = Pick<Todo, 'id' | 'description' | 'assigned_to_name'>;
+export interface UpdateTodoInput {
+  description: string;
+  assigned_to_name: string;
+  completed?: boolean;
+}
+
+export type TodoEditable = Pick<Todo, 'id' | 'description' | 'assigned_to_name' | 'completed'>;

@@ -5,21 +5,27 @@ type AppConfig = {
   frontendBaseUrl: string;
 };
 
-function requireEnv(name: string): string {
+function getEnv(name: string): string {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(
-      `[Config error] Missing required environment variable: ${name}`
-    );
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `[Config error] Missing required environment variable: ${name}`
+      );
+    }
+
+    // Dev / local fallback (prevents blank screen)
+    console.warn(`[Config warning] ${name} is not defined`);
+    return '';
   }
 
-  return value.replace(/\/+$/, ''); // remove trailing slash
+  return value.replace(/\/+$/, '');
 }
 
 const config: AppConfig = {
-  apiBaseUrl: requireEnv('REACT_APP_API_URL'),
-  frontendBaseUrl: requireEnv('REACT_APP_FRONTEND_URL'),
+  apiBaseUrl: getEnv('REACT_APP_API_URL'),
+  frontendBaseUrl: getEnv('REACT_APP_FRONTEND_URL'),
 };
 
 export default config;

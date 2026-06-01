@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"react-todos/apps/api/internal/models"
 
@@ -34,15 +35,53 @@ func (r *TodoRepository) GetAllByUser(
 	ctx context.Context,
 	userID uuid.UUID,
 	limit, offset int,
+	sortBy, sortOrder string,
+	filterCompleted *bool,
+	filterAssigned string,
 ) ([]models.Todo, int, error) {
-	// Use window function to get total count alongside paginated rows
-	rows, err := r.DB.Query(ctx, `
+	// Build the base query
+	query := `
 		SELECT id, user_id, assigned_to_name, description, completed, created_at, updated_at, count(*) OVER() as total_count
 		FROM todos
 		WHERE user_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3
-	`, userID, limit, offset)
+	`
+	
+	// Build arguments slice
+	args := []any{userID}
+	argIndex := 2
+	
+	// Add filters
+	if filterCompleted != nil {
+		query += fmt.Sprintf(" AND completed = $%d", argIndex)
+		args = append(args, *filterCompleted)
+		argIndex++
+	}
+	
+	if filterAssigned != "" {
+		query += fmt.Sprintf(" AND assigned_to_name ILIKE $%d", argIndex)
+		args = append(args, "%"+filterAssigned+"%")
+		argIndex++
+	}
+	
+	// Add sorting
+	switch sortBy {
+	case "created_at":
+		query += fmt.Sprintf(" ORDER BY created_at %s", sortOrder)
+	case "description":
+		query += fmt.Sprintf(" ORDER BY description %s", sortOrder)
+	case "assigned_to_name":
+		query += fmt.Sprintf(" ORDER BY assigned_to_name %s", sortOrder)
+	case "updated_at":
+		query += fmt.Sprintf(" ORDER BY updated_at %s", sortOrder)
+	default:
+		query += " ORDER BY created_at DESC"
+	}
+	
+	// Add pagination
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+	args = append(args, limit, offset)
+	
+	rows, err := r.DB.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -71,8 +110,23 @@ func (r *TodoRepository) GetAllByUser(
 
 	// If no rows were returned, still compute total count
 	if total == 0 {
+		countQuery := `SELECT count(*) FROM todos WHERE user_id = $1`
+		countArgs := []any{userID}
+		countArgIndex := 2
+		
+		if filterCompleted != nil {
+			countQuery += fmt.Sprintf(" AND completed = $%d", countArgIndex)
+			countArgs = append(countArgs, *filterCompleted)
+			countArgIndex++
+		}
+		
+		if filterAssigned != "" {
+			countQuery += fmt.Sprintf(" AND assigned_to_name ILIKE $%d", countArgIndex)
+			countArgs = append(countArgs, "%"+filterAssigned+"%")
+		}
+		
 		var cnt int
-		if err := r.DB.QueryRow(ctx, `SELECT count(*) FROM todos WHERE user_id = $1`, userID).Scan(&cnt); err == nil {
+		if err := r.DB.QueryRow(ctx, countQuery, countArgs...).Scan(&cnt); err == nil {
 			total = cnt
 		}
 	}

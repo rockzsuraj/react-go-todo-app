@@ -9,6 +9,7 @@ import LoadingSkeleton from './components/LoadingSkeleton';
 const Home = React.lazy(() => import('./pages/Home'));
 const Login = React.lazy(() => import('./pages/Login'));
 const AuthCallback = React.lazy(() => import('./pages/AuthCallback'));
+const Admin = React.lazy(() => import('./pages/Admin'));
 
 function App() {
   return (
@@ -32,6 +33,11 @@ function App() {
           <Route path="/oauth/callback" element={
             <Suspense fallback={<LoadingSkeleton />}>
               <AuthCallback />
+            </Suspense>
+          } />
+          <Route path="/admin" element={
+            <Suspense fallback={<LoadingSkeleton />}>
+              <Admin />
             </Suspense>
           } />
         </Route>

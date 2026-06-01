@@ -26,11 +26,14 @@ func (s *TodoService) GetAll(
 	ctx context.Context,
 	userID uuid.UUID,
 	limit, offset int,
+	sortBy, sortOrder string,
+	filterCompleted *bool,
+	filterAssigned string,
 ) ([]models.Todo, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	return s.repo.GetAllByUser(ctx, userID, limit, offset)
+	return s.repo.GetAllByUser(ctx, userID, limit, offset, sortBy, sortOrder, filterCompleted, filterAssigned)
 }
 
 /*

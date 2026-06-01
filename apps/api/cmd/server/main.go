@@ -14,6 +14,8 @@ import (
 	"react-todos/apps/api/internal/services"
 	"syscall"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -35,21 +37,34 @@ func main() {
 	database := db.NewPostgresDB(dbCfg)
 	defer database.Close()
 
+	// Redis
+	redisAddr := config.GetEnv("REDIS_ADDR", "localhost:6379")
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+	})
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		logger.Error("redis connection failed", "error", err)
+		os.Exit(1)
+	}
+	defer redisClient.Close()
+
 	// Repositories
 	todoRepo := repository.NewTodoRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
+	blacklistRepo := repository.NewRedisBlacklistRepository(redisClient)
 
 	// Services
 	todoService := services.NewTodoService(todoRepo)
-	authService := services.NewAuthService(userRepo, refreshTokenRepo)
+	authService := services.NewAuthService(userRepo, refreshTokenRepo, blacklistRepo)
 
 	// Handlers (INIT ONCE)
 	handlers.InitHandlers(todoService)
 	handlers.InitAuthHandlers(authService)
+	handlers.InitAdminHandlers(authService)
 
 	// Router
-	router := routes.SetupRouter()
+	router := routes.SetupRouter(authService)
 
 	// HTTP server
 	server := &http.Server{

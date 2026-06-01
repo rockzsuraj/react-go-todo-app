@@ -12,11 +12,12 @@ func CORS() func(http.Handler) http.Handler {
 		AllowedOrigins: []string{
 			"http://localhost:3000",
 			"https://react-springboot-full-stack.onrender.com",
+			// Add your production domains here
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-API-Key", "Cookie"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
-		MaxAge:           300,
+		MaxAge:           300, // 5 minutes
 	})
 }

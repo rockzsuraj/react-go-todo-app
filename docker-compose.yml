@@ -2,59 +2,71 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-todos}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   backend:
     build:
-      context: .
-      dockerfile: apps/api/backend.dev.Dockerfile
+      context: ./apps/api
+      dockerfile: backend.Dockerfile
+      target: ${ENV:-development}
     ports:
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      - REDIS_ADDR=redis:6379
+      - ENV=${ENV:-development}
     volumes:
       - ./apps/api:/app
       - air_tmp:/app/tmp
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
-      context: .
-      dockerfile: apps/web/frontend.Dockerfile
+      context: ./apps/web
+      dockerfile: frontend.Dockerfile
+      target: ${ENV:-development}
     ports:
       - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8080}
+      - REACT_APP_FRONTEND_URL=${REACT_APP_FRONTEND_URL:-http://localhost:3000}
+      - ENV=${ENV:-development}
+      - PORT=3000
     volumes:
       - ./apps/web:/app
       - /app/node_modules
-
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@pgadmin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
     depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - backend
 
 volumes:
   postgres_data:
-  pgadmin_data:
   air_tmp:

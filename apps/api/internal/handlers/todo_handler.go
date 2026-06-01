@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"react-todos/apps/api/internal/dto"
 	"react-todos/apps/api/internal/middleware"
@@ -49,27 +50,54 @@ GET /api/todos
 func GetTodos(w http.ResponseWriter, r *http.Request) {
 	userID, err := getUserUUID(r)
 	if err != nil {
-		middleware.SendError(w, err)
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_UNAUTHORIZED", "Unauthorized")
 		return
 	}
 
-	// Parse pagination query params (page, limit)
+	// Parse pagination query params with validation
 	page := 1
-	limit := 25
+	limit := 10 // Default limit
 	if p := r.URL.Query().Get("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 && v <= 1000 {
 			page = v
 		}
 	}
 	if l := r.URL.Query().Get("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
 			limit = v
 		}
 	}
 
+	// Parse sorting parameters with validation
+	sortBy := r.URL.Query().Get("sort_by")
+	sortOrder := strings.ToUpper(r.URL.Query().Get("sort_order"))
+	allowedSortFields := map[string]bool{
+		"created_at": true, "updated_at": true, "description": true, "completed": true,
+	}
+	if !allowedSortFields[sortBy] {
+		sortBy = "created_at"
+	}
+	if sortOrder != "ASC" && sortOrder != "DESC" {
+		sortOrder = "ASC"
+	}
+
+	// Parse filtering parameters with validation
+	var filterCompleted *bool
+	if fc := r.URL.Query().Get("completed"); fc != "" {
+		if v, err := strconv.ParseBool(fc); err == nil {
+			filterCompleted = &v
+		}
+	}
+
+	filterAssigned := r.URL.Query().Get("assigned")
+	if len(filterAssigned) > 100 {
+		middleware.SendJSONErrorWithCode(w, http.StatusBadRequest, "ERR_INVALID_FILTER", "Filter value too long")
+		return
+	}
+
 	offset := (page - 1) * limit
 
-	todos, total, err := todoService.GetAll(r.Context(), userID, limit, offset)
+	todos, total, err := todoService.GetAll(r.Context(), userID, limit, offset, sortBy, sortOrder, filterCompleted, filterAssigned)
 	if err != nil {
 		middleware.SendError(w, err)
 		return
@@ -187,7 +215,8 @@ func UpdateTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(dto.SuccessResponse(nil))
 }
 
 /*
@@ -216,5 +245,6 @@ func DeleteTodoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(dto.SuccessResponse(nil))
 }

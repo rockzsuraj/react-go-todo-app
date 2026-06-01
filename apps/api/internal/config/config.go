@@ -47,6 +47,7 @@ type AppConfig struct {
 	GoogleClientSecret string
 	GoogleRedirectURL  string
 	JWTSecret          string
+	FrontendURL        string
 }
 
 // LoadAppConfig loads non-DB related configuration from environment variables.
@@ -56,7 +57,8 @@ func LoadAppConfig() AppConfig {
 		Port:               GetEnv("PORT", "8080"),
 		GoogleClientID:     GetEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: GetEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleRedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", "http://localhost:8080/api/auth/google/callback"),
+		GoogleRedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", "http://localhost:8080/api/auth/callback/google"),
 		JWTSecret:          GetEnv("JWT_SECRET", "dev-jwt-secret"),
+		FrontendURL:        GetEnv("FRONTEND_URL", "http://localhost:3000"),
 	}
 }
