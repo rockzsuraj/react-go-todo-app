@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -28,11 +27,7 @@ func NewRateLimiter() *RateLimiter {
 func (rl *RateLimiter) RateLimit(limit int, window time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				http.Error(w, "invalid IP", http.StatusBadRequest)
-				return
-			}
+			ip := GetClientIP(r)
 
 			now := time.Now()
 

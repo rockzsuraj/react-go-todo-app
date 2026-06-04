@@ -39,7 +39,7 @@ export function useAuth() {
     retry: false,
     staleTime: 30_000,           // re-use cached user for 30 s
     gcTime: 5 * 60_000,          // keep in cache for 5 min after unmount
-    refetchOnWindowFocus: true,  // re-validate when user switches back to tab
+    refetchOnWindowFocus: false, // disable aggressive refetching on window focus to prevent rate-limiting
     refetchOnReconnect: true,
   });
 }

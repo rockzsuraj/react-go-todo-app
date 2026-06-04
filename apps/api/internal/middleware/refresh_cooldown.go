@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -21,7 +20,7 @@ var refreshFailures sync.Map // key: ip, value: refreshEntry
 func RefreshCooldown(cooldown time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+			ip := GetClientIP(r)
 
 			if v, ok := refreshFailures.Load(ip); ok {
 				entry := v.(refreshEntry)
