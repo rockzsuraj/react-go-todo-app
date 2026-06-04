@@ -37,6 +37,12 @@ func main() {
 	database := db.NewPostgresDB(dbCfg)
 	defer database.Close()
 
+	// Migrations
+	if err := db.RunMigrations(ctx, database, "./migrations"); err != nil {
+		logger.Error("migrations failed", "error", err)
+		os.Exit(1)
+	}
+
 	// Redis
 	redisAddr := config.GetEnv("REDIS_ADDR", "localhost:6379")
 	redisClient := redis.NewClient(&redis.Options{
