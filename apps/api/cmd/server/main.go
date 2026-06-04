@@ -44,10 +44,22 @@ func main() {
 	}
 
 	// Redis
-	redisAddr := config.GetEnv("REDIS_ADDR", "localhost:6379")
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
-	})
+	redisURL := config.GetEnv("REDIS_URL", "")
+	var redisClient *redis.Client
+	if redisURL != "" {
+		opt, err := redis.ParseURL(redisURL)
+		if err != nil {
+			logger.Error("failed to parse REDIS_URL", "error", err)
+			os.Exit(1)
+		}
+		redisClient = redis.NewClient(opt)
+	} else {
+		redisAddr := config.GetEnv("REDIS_ADDR", "localhost:6379")
+		redisClient = redis.NewClient(&redis.Options{
+			Addr: redisAddr,
+		})
+	}
+
 	if err := redisClient.Ping(ctx).Err(); err != nil {
 		logger.Warn("redis unavailable, token blacklisting disabled", "error", err)
 		redisClient = nil
