@@ -246,6 +246,9 @@ code {
 
 /* ================= PREMIUM NAVBAR ================= */
 .premium-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1030;
   background: rgba(255, 255, 255, 0.75) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -308,6 +311,7 @@ code {
   padding: 8px !important;
   margin-top: 10px !important;
   border-top: none;
+  z-index: 1050 !important;
 }
 
 .dropdown-item-premium {
