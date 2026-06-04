@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import UpdateTodoForm from './UpdateTodoForm';
 import type { Todo } from '../types/todo';
+import UpdateTodoForm from './UpdateTodoForm';
 
 interface Props {
   todo: Todo;
@@ -32,14 +32,18 @@ function TodoRowItem({
           </div>
         </td>
         <td>
-          <div className={`fw-semibold ${todo.completed ? 'text-decoration-line-through text-muted' : ''}`}>
+          <div
+            className={`fw-semibold ${todo.completed ? 'text-decoration-line-through text-muted' : ''}`}
+          >
             {todo.description}
           </div>
         </td>
         <td>
           <div className="d-flex align-items-center gap-2">
-            <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
-                 style={{ width: '32px', height: '32px', fontSize: '14px' }}>
+            <div
+              className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+              style={{ width: '32px', height: '32px', fontSize: '14px' }}
+            >
               {todo.assigned_to_name.charAt(0).toUpperCase()}
             </div>
             <span>{todo.assigned_to_name}</span>
@@ -67,7 +71,9 @@ function TodoRowItem({
               className="btn btn-outline-danger btn-sm"
               disabled={isDeleting}
             >
-              <i className={`bi ${isDeleting ? 'bi-hourglass-split' : 'bi-trash'}`}></i>
+              <i
+                className={`bi ${isDeleting ? 'bi-hourglass-split' : 'bi-trash'}`}
+              ></i>
             </button>
           </div>
         </td>
@@ -76,10 +82,7 @@ function TodoRowItem({
       {isEditing && (
         <tr>
           <td colSpan={5} className="bg-light">
-            <UpdateTodoForm
-              todo={todo}
-              onCancel={() => setIsEditing(false)}
-            />
+            <UpdateTodoForm todo={todo} onCancel={() => setIsEditing(false)} />
           </td>
         </tr>
       )}

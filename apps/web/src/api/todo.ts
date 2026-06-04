@@ -1,10 +1,10 @@
 import type { APIResponse } from '../types/api';
-import type { Todo, CreateTodoInput, UpdateTodoInput } from '../types/todo';
+import type { CreateTodoInput, Todo, UpdateTodoInput } from '../types/todo';
 import { apiClient } from './client';
 
 export const todoApi = {
-  getAll: (params?: { 
-    page?: number; 
+  getAll: (params?: {
+    page?: number;
     limit?: number;
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
@@ -22,7 +22,9 @@ export const todoApi = {
         }
       : undefined;
 
-    return apiClient.get<APIResponse<Todo[]>>('/todos', { params: queryParams });
+    return apiClient.get<APIResponse<Todo[]>>('/todos', {
+      params: queryParams,
+    });
   },
 
   create: (payload: CreateTodoInput) =>
@@ -31,6 +33,5 @@ export const todoApi = {
   update: (id: number, payload: UpdateTodoInput) =>
     apiClient.put<APIResponse<Todo>>(`/todos/${id}`, payload),
 
-  delete: (id: number) =>
-    apiClient.delete<APIResponse<null>>(`/todos/${id}`),
+  delete: (id: number) => apiClient.delete<APIResponse<null>>(`/todos/${id}`),
 };

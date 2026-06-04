@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -86,7 +87,12 @@ func authenticateJWT(r *http.Request, secret string, authService services.AuthSe
 		return []byte(secret), nil
 	})
 
-	if err != nil || !token.Valid {
+	if err != nil {
+		slog.Warn("JWT parse error", "error", err)
+		return "", false
+	}
+	if !token.Valid {
+		slog.Warn("JWT token is invalid")
 		return "", false
 	}
 
@@ -97,11 +103,13 @@ func authenticateJWT(r *http.Request, secret string, authService services.AuthSe
 			// Check if token is blacklisted by jti
 			if jti, ok := claims["jti"].(string); ok && jti != "" {
 				if blacklisted, err := authService.IsTokenBlacklisted(r.Context(), jti); err == nil && blacklisted {
+					slog.Warn("JWT token is blacklisted", "jti", jti)
 					return "", false
 				}
 			}
 			// Check if user is blacklisted (admin revoke)
 			if userBlacklisted, err := authService.IsUserBlacklisted(r.Context(), sub); err == nil && userBlacklisted {
+				slog.Warn("JWT user is blacklisted", "sub", sub)
 				return "", false
 			}
 			return sub, true

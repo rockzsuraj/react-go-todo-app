@@ -23,7 +23,7 @@ function NewTodoForm({ onSuccess }: { onSuccess?: () => void }) {
           setAssignedToName('');
           if (onSuccess) onSuccess();
         },
-      }
+      },
     );
   }
 

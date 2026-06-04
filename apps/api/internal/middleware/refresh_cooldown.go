@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,16 +44,27 @@ func RefreshCooldown(cooldown time.Duration) func(http.Handler) http.Handler {
 
 			// Track failures with count
 			if rw.status == http.StatusUnauthorized {
-				if v, ok := refreshFailures.Load(ip); ok {
-					entry := v.(refreshEntry)
-					entry.lastFail = time.Now()
-					entry.failureCount++
-					refreshFailures.Store(ip, entry)
-				} else {
-					refreshFailures.Store(ip, refreshEntry{
-						lastFail:     time.Now(),
-						failureCount: 1,
-					})
+				// Only track as failure if a token was actually provided but was invalid/expired.
+				// If no token was provided at all, it's a standard unauthenticated check and not a failure.
+				hasToken := false
+				if _, err := r.Cookie("refresh_token"); err == nil {
+					hasToken = true
+				} else if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
+					hasToken = true
+				}
+
+				if hasToken {
+					if v, ok := refreshFailures.Load(ip); ok {
+						entry := v.(refreshEntry)
+						entry.lastFail = time.Now()
+						entry.failureCount++
+						refreshFailures.Store(ip, entry)
+					} else {
+						refreshFailures.Store(ip, refreshEntry{
+							lastFail:     time.Now(),
+							failureCount: 1,
+						})
+					}
 				}
 			} else if rw.status == http.StatusOK {
 				// Reset failure count on success

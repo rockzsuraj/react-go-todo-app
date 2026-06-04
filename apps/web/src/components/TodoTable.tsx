@@ -1,5 +1,5 @@
-import TodoRowItem from './TodoRowItem';
 import type { Todo } from '../types/todo';
+import TodoRowItem from './TodoRowItem';
 
 interface Props {
   todos: Todo[];
@@ -18,7 +18,7 @@ function TodoTable({
   isDeleting = false,
   sortBy,
   sortOrder,
-  onSort
+  onSort,
 }: Props) {
   const getSortIcon = (field: string) => {
     if (sortBy !== field) return 'bi bi-arrow-down-up';
@@ -33,7 +33,9 @@ function TodoTable({
         </div>
         <h5 className="text-muted">No todos found</h5>
         <p className="text-muted">
-          {isDeleting ? 'Deleting...' : 'Create your first todo to get started!'}
+          {isDeleting
+            ? 'Deleting...'
+            : 'Create your first todo to get started!'}
         </p>
       </div>
     );
@@ -52,7 +54,9 @@ function TodoTable({
             >
               <i className="bi bi-text-paragraph me-1"></i>
               Description
-              {onSort && <i className={`ms-1 ${getSortIcon('description')}`}></i>}
+              {onSort && (
+                <i className={`ms-1 ${getSortIcon('description')}`}></i>
+              )}
             </th>
             <th
               className="border-0 fw-semibold text-primary"
@@ -61,7 +65,9 @@ function TodoTable({
             >
               <i className="bi bi-person me-1"></i>
               Assigned To
-              {onSort && <i className={`ms-1 ${getSortIcon('assigned_to_name')}`}></i>}
+              {onSort && (
+                <i className={`ms-1 ${getSortIcon('assigned_to_name')}`}></i>
+              )}
             </th>
             <th
               className="border-0 fw-semibold text-primary"
@@ -70,7 +76,9 @@ function TodoTable({
             >
               <i className="bi bi-calendar-plus me-1"></i>
               Created
-              {onSort && <i className={`ms-1 ${getSortIcon('created_at')}`}></i>}
+              {onSort && (
+                <i className={`ms-1 ${getSortIcon('created_at')}`}></i>
+              )}
             </th>
             <th className="border-0 fw-semibold text-primary">Actions</th>
           </tr>

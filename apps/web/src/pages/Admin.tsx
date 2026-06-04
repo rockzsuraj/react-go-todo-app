@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useRevokeUser, useUnblockUser } from '../hooks/useAdmin';
 import { useAuth } from '../hooks/useAuth';
-import { Navigate } from 'react-router-dom';
 import { APIErrorHandler } from '../utils/errorHandler';
 
 export default function Admin() {
@@ -16,37 +16,51 @@ export default function Admin() {
 
   // Simple role check; adjust if your user object has a role field
   if (user.role !== 'admin') {
-    return <div className="container mt-5 text-danger">Access denied: Admins only</div>;
+    return (
+      <div className="container mt-5 text-danger">
+        Access denied: Admins only
+      </div>
+    );
   }
 
   const handleRevoke = () => {
     if (!userID.trim()) return;
-    revokeUserMutation.mutate({ userID }, {
-      onSuccess: () => {
-        setUserID('');
-        alert('User revoked successfully');
+    revokeUserMutation.mutate(
+      { userID },
+      {
+        onSuccess: () => {
+          setUserID('');
+          alert('User revoked successfully');
+        },
+        onError: (err: unknown) => {
+          const apiError = APIErrorHandler.getError(err);
+          const message = apiError
+            ? APIErrorHandler.getUserFriendlyMessage(apiError)
+            : 'Failed to revoke user';
+          alert(message);
+        },
       },
-      onError: (err: unknown) => {
-        const apiError = APIErrorHandler.getError(err);
-        const message = apiError ? APIErrorHandler.getUserFriendlyMessage(apiError) : 'Failed to revoke user';
-        alert(message);
-      },
-    });
+    );
   };
 
   const handleUnblock = () => {
     if (!userID.trim()) return;
-    unblockUserMutation.mutate({ userID }, {
-      onSuccess: () => {
-        setUserID('');
-        alert('User unblocked successfully');
+    unblockUserMutation.mutate(
+      { userID },
+      {
+        onSuccess: () => {
+          setUserID('');
+          alert('User unblocked successfully');
+        },
+        onError: (err: unknown) => {
+          const apiError = APIErrorHandler.getError(err);
+          const message = apiError
+            ? APIErrorHandler.getUserFriendlyMessage(apiError)
+            : 'Failed to unblock user';
+          alert(message);
+        },
       },
-      onError: (err: unknown) => {
-        const apiError = APIErrorHandler.getError(err);
-        const message = apiError ? APIErrorHandler.getUserFriendlyMessage(apiError) : 'Failed to unblock user';
-        alert(message);
-      },
-    });
+    );
   };
 
   return (
@@ -57,7 +71,9 @@ export default function Admin() {
         </div>
         <div className="card-body">
           <div className="mb-3">
-            <label htmlFor="user-id" className="form-label">User ID</label>
+            <label htmlFor="user-id" className="form-label">
+              User ID
+            </label>
             <input
               id="user-id"
               type="text"
@@ -70,6 +86,7 @@ export default function Admin() {
 
           <div className="d-flex gap-2">
             <button
+              type="button"
               className="btn btn-danger"
               onClick={handleRevoke}
               disabled={!userID.trim() || revokeUserMutation.isPending}
@@ -78,6 +95,7 @@ export default function Admin() {
             </button>
 
             <button
+              type="button"
               className="btn btn-success"
               onClick={handleUnblock}
               disabled={!userID.trim() || unblockUserMutation.isPending}
@@ -88,7 +106,8 @@ export default function Admin() {
 
           <div className="mt-3 text-muted">
             <small>
-              Revoking a user will invalidate all their JWTs immediately. Unblock restores access.
+              Revoking a user will invalidate all their JWTs immediately.
+              Unblock restores access.
             </small>
           </div>
         </div>

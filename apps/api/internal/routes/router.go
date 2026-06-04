@@ -46,13 +46,13 @@ func SetupRouter(authService services.AuthServicer) http.Handler {
 
 		// 1. Auth Sub-group
 		r.Route("/auth", func(r chi.Router) {
-			r.Use(authLimiter.RateLimit(30, time.Minute))
 
 			// --- PUBLIC AUTH ---
-			r.Get("/google/login", handlers.GoogleLogin)
+			r.With(authLimiter.RateLimit(10, time.Minute)).
+				Get("/google/login", handlers.GoogleLogin)
 			r.Get("/callback/google", handlers.GoogleCallback)
 
-			// Refresh is public but has a cooldown
+			// Refresh is public but has a cooldown (no global rate limit)
 			r.With(appMiddleware.RefreshCooldown(30*time.Second)).
 				Post("/refresh", handlers.RefreshToken)
 
@@ -78,7 +78,7 @@ func SetupRouter(authService services.AuthServicer) http.Handler {
 		// 3. Admin Sub-group (Requires Authentication + Admin role)
 		r.Group(func(r chi.Router) {
 			r.Use(appMiddleware.AuthMiddleware(cfg.JWTSecret, authService))
-			r.Use(appMiddleware.AdminOnly)
+			r.Use(appMiddleware.AdminOnly(cfg.JWTSecret))
 
 			r.Post("/admin/revoke-user", handlers.RevokeUserTokens)
 			r.Post("/admin/unblock-user", handlers.UnblockUser)

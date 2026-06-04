@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -59,7 +58,7 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	redirect := r.URL.Query().Get("redirect")
 	state := ""
 	if redirect != "" {
-		state = url.QueryEscape(redirect)
+		state = redirect
 	}
 
 	authURL := oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
@@ -74,6 +73,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	// 🔍 Detect mobile client
 	accept := r.Header.Get("Accept")
 	isMobile := strings.Contains(accept, "application/json")
+	slog.Info("callback request", "accept", accept, "isMobile", isMobile, "all_headers", r.Header)
 
 	oauthCfg := &oauth2.Config{
 		ClientID:     appCfg.GoogleClientID,
@@ -136,10 +136,10 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	// 🔐 Access token (15 min)
 	jti := uuid.NewString()
 	claims := jwt.MapClaims{
-		"sub": user.ID,
-		"jti": jti,
+		"sub":  user.ID,
+		"jti":  jti,
 		"role": user.Role,
-		"exp": time.Now().Add(15 * time.Minute).Unix(),
+		"exp":  time.Now().Add(15 * time.Minute).Unix(),
 	}
 
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -170,31 +170,6 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secure := appCfg.Env == "production"
-
-	/* ===================== WEB ===================== */
-	if !isMobile {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "refresh_token",
-			Value:    refreshToken,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   30 * 24 * 60 * 60,
-		})
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "token",
-			Value:    accessToken,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   15 * 60,
-		})
-	}
-
 	/* ===================== MOBILE ===================== */
 	if isMobile {
 		w.Header().Set("Content-Type", "application/json")
@@ -205,18 +180,30 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/* ===================== REDIRECT ===================== */
-	redirect := r.URL.Query().Get("state")
-	if redirect != "" {
-		if u, err := url.QueryUnescape(redirect); err == nil {
-			if parsed, err := url.Parse(u); err == nil && parsed.Scheme != "" {
-				http.Redirect(w, r, u, http.StatusTemporaryRedirect)
-				return
-			}
-		}
-	}
+	/* ===================== WEB: set cookies on redirect, no tokens in URL ===================== */
+	secure := appCfg.Env == "production"
 
-	http.Redirect(w, r, appCfg.FrontendURL, http.StatusTemporaryRedirect)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    accessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   15 * 60,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   30 * 24 * 60 * 60,
+	})
+
+	redirectURL := appCfg.FrontendURL + "/oauth/callback"
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 /* ===================== AUTH ME ===================== */
@@ -279,7 +266,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   appCfg.Env == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
 
@@ -289,7 +276,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   appCfg.Env == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
 
@@ -338,7 +325,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Refresh token validation failed", "error", err)
 		errorCode := "ERR_INVALID_TOKEN"
 		errorMessage := "Invalid refresh token"
-		
+
 		// Provide more specific error messages for common cases
 		switch err.Error() {
 		case "token expired":
@@ -348,7 +335,27 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 			errorCode = "ERR_INVALID_TOKEN"
 			errorMessage = "Invalid refresh token"
 		}
-		
+
+		// Clear cookies on failure to prevent browser from sending bad credentials again
+		http.SetCookie(w, &http.Cookie{
+			Name:     "token",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   appCfg.Env == "production",
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+		http.SetCookie(w, &http.Cookie{
+			Name:     "refresh_token",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   appCfg.Env == "production",
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+
 		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, errorCode, errorMessage)
 		return
 	}
@@ -363,10 +370,10 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	// Generate new access token
 	jti := uuid.NewString()
 	claims := jwt.MapClaims{
-		"sub": userID,
-		"jti": jti,
+		"sub":  userID,
+		"jti":  jti,
 		"role": user.Role,
-		"exp": time.Now().Add(15 * time.Minute).Unix(),
+		"exp":  time.Now().Add(15 * time.Minute).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -384,7 +391,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   appCfg.Env == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   15 * 60,
 	})
 
@@ -396,7 +403,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   appCfg.Env == "production",
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteLaxMode,
 			MaxAge:   30 * 24 * 60 * 60,
 		})
 		slog.Debug("Set new refresh token cookie")
@@ -405,15 +412,15 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	// 📱 Mobile response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	
+
 	response := dto.SuccessResponse(map[string]string{"access_token": accessToken})
 	if newRefreshToken != "" {
 		response.Data.(map[string]string)["refresh_token"] = newRefreshToken
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		slog.Error("Failed to encode refresh response", "error", err)
 	}
-	
+
 	slog.Info("Successfully refreshed token", "user_id", userID)
 }

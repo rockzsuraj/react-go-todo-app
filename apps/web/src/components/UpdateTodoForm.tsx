@@ -20,25 +20,25 @@ function UpdateTodoForm({ todo, onCancel }: Props) {
     setAssigned(event.target.value);
   }
 
-function submitUpdate() {
-  if (description !== '' && assigned !== '') {
-    updateTodoMutation.mutate(
-      {
-        id: todo.id,
-        payload: {
-          description,
-          assigned_to_name: assigned,
-          completed: todo.completed,
+  function submitUpdate() {
+    if (description !== '' && assigned !== '') {
+      updateTodoMutation.mutate(
+        {
+          id: todo.id,
+          payload: {
+            description,
+            assigned_to_name: assigned,
+            completed: todo.completed,
+          },
         },
-      },
-      {
-        onSuccess: () => {
-          onCancel();
+        {
+          onSuccess: () => {
+            onCancel();
+          },
         },
-      }
-    );
+      );
+    }
   }
-}
 
   return (
     <div className="mt-3 p-3 border rounded">
@@ -78,11 +78,7 @@ function submitUpdate() {
         >
           {updateTodoMutation.isPending ? 'Updating...' : 'Update'}
         </button>
-        <button
-          onClick={onCancel}
-          type="button"
-          className="btn btn-secondary"
-        >
+        <button onClick={onCancel} type="button" className="btn btn-secondary">
           Cancel
         </button>
       </div>

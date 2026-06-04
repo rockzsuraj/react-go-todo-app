@@ -18,4 +18,7 @@ export interface UpdateTodoInput {
   completed?: boolean;
 }
 
-export type TodoEditable = Pick<Todo, 'id' | 'description' | 'assigned_to_name' | 'completed'>;
+export type TodoEditable = Pick<
+  Todo,
+  'id' | 'description' | 'assigned_to_name' | 'completed'
+>;

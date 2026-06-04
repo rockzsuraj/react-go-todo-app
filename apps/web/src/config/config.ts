@@ -11,7 +11,7 @@ function getEnv(name: string): string {
   if (!value) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error(
-        `[Config error] Missing required environment variable: ${name}`
+        `[Config error] Missing required environment variable: ${name}`,
       );
     }
 

@@ -83,12 +83,35 @@ func (m *MockRefreshTokenRepository) DeleteByUser(ctx context.Context, userID st
 	return nil
 }
 
+type MockTokenBlacklistRepository struct{}
+
+func (m *MockTokenBlacklistRepository) IsBlacklisted(ctx context.Context, jti string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockTokenBlacklistRepository) Add(ctx context.Context, jti string, expiresAt time.Time) error {
+	return nil
+}
+
+func (m *MockTokenBlacklistRepository) BlacklistAllForUser(ctx context.Context, userID string) error {
+	return nil
+}
+
+func (m *MockTokenBlacklistRepository) IsUserBlacklisted(ctx context.Context, userID string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockTokenBlacklistRepository) UnblockUser(ctx context.Context, userID string) error {
+	return nil
+}
+
 // --- Service Tests ---
 
 func TestAuthService_StoreRefreshToken(t *testing.T) {
 	userRepo := NewMockUserRepository()
 	refreshRepo := NewMockRefreshTokenRepository()
-	authService := NewAuthService(userRepo, refreshRepo)
+	blacklistRepo := &MockTokenBlacklistRepository{}
+	authService := NewAuthService(userRepo, refreshRepo, blacklistRepo)
 
 	ctx := context.Background()
 	refreshID := uuid.New().String()
@@ -111,7 +134,8 @@ func TestAuthService_StoreRefreshToken(t *testing.T) {
 func TestAuthService_DeleteRefreshToken(t *testing.T) {
 	userRepo := NewMockUserRepository()
 	refreshRepo := NewMockRefreshTokenRepository()
-	authService := NewAuthService(userRepo, refreshRepo)
+	blacklistRepo := &MockTokenBlacklistRepository{}
+	authService := NewAuthService(userRepo, refreshRepo, blacklistRepo)
 
 	ctx := context.Background()
 	token := "token-to-delete"
@@ -140,7 +164,8 @@ func TestAuthService_DeleteRefreshToken(t *testing.T) {
 func TestAuthService_ValidateAndRotateRefreshToken_ValidToken(t *testing.T) {
 	userRepo := NewMockUserRepository()
 	refreshRepo := NewMockRefreshTokenRepository()
-	authService := NewAuthService(userRepo, refreshRepo)
+	blacklistRepo := &MockTokenBlacklistRepository{}
+	authService := NewAuthService(userRepo, refreshRepo, blacklistRepo)
 
 	ctx := context.Background()
 	userID := uuid.New().String()
@@ -158,29 +183,33 @@ func TestAuthService_ValidateAndRotateRefreshToken_ValidToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate token
-	resultUserID, err := authService.ValidateAndRotateRefreshToken(ctx, token)
+	resultUserID, newRotatedToken, err := authService.ValidateAndRotateRefreshToken(ctx, token)
 	assert.NoError(t, err)
 	assert.Equal(t, userID, resultUserID)
+	assert.NotEmpty(t, newRotatedToken)
 }
 
 func TestAuthService_ValidateAndRotateRefreshToken_InvalidToken(t *testing.T) {
 	userRepo := NewMockUserRepository()
 	refreshRepo := NewMockRefreshTokenRepository()
-	authService := NewAuthService(userRepo, refreshRepo)
+	blacklistRepo := &MockTokenBlacklistRepository{}
+	authService := NewAuthService(userRepo, refreshRepo, blacklistRepo)
 
 	ctx := context.Background()
 
 	// Try to validate non-existent token
-	resultUserID, err := authService.ValidateAndRotateRefreshToken(ctx, "invalid-token")
+	resultUserID, newRotatedToken, err := authService.ValidateAndRotateRefreshToken(ctx, "invalid-token")
 	assert.Error(t, err)
 	assert.Equal(t, "", resultUserID)
+	assert.Equal(t, "", newRotatedToken)
 	assert.Contains(t, err.Error(), "invalid token")
 }
 
 func TestAuthService_ValidateAndRotateRefreshToken_ExpiredToken(t *testing.T) {
 	userRepo := NewMockUserRepository()
 	refreshRepo := NewMockRefreshTokenRepository()
-	authService := NewAuthService(userRepo, refreshRepo)
+	blacklistRepo := &MockTokenBlacklistRepository{}
+	authService := NewAuthService(userRepo, refreshRepo, blacklistRepo)
 
 	ctx := context.Background()
 	userID := uuid.New().String()
@@ -198,9 +227,10 @@ func TestAuthService_ValidateAndRotateRefreshToken_ExpiredToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate token (should fail and delete expired token)
-	resultUserID, err := authService.ValidateAndRotateRefreshToken(ctx, token)
+	resultUserID, newRotatedToken, err := authService.ValidateAndRotateRefreshToken(ctx, token)
 	assert.Error(t, err)
 	assert.Equal(t, "", resultUserID)
+	assert.Equal(t, "", newRotatedToken)
 	assert.Contains(t, err.Error(), "token expired")
 
 	// Verify expired token was deleted
@@ -212,7 +242,8 @@ func TestAuthService_ValidateAndRotateRefreshToken_ExpiredToken(t *testing.T) {
 func TestAuthService_HandleGoogleLogin(t *testing.T) {
 	userRepo := NewMockUserRepository()
 	refreshRepo := NewMockRefreshTokenRepository()
-	authService := NewAuthService(userRepo, refreshRepo)
+	blacklistRepo := &MockTokenBlacklistRepository{}
+	authService := NewAuthService(userRepo, refreshRepo, blacklistRepo)
 
 	ctx := context.Background()
 	googleUserID := "google-123"
@@ -235,7 +266,8 @@ func TestAuthService_HandleGoogleLogin(t *testing.T) {
 func TestAuthService_GetUserByID(t *testing.T) {
 	userRepo := NewMockUserRepository()
 	refreshRepo := NewMockRefreshTokenRepository()
-	authService := NewAuthService(userRepo, refreshRepo)
+	blacklistRepo := &MockTokenBlacklistRepository{}
+	authService := NewAuthService(userRepo, refreshRepo, blacklistRepo)
 
 	ctx := context.Background()
 

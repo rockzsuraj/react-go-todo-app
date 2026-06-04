@@ -24,7 +24,7 @@ fi
 echo ""
 echo "3. 🔗 Testing OAuth login endpoint..."
 LOGIN_URL="http://localhost:8080/api/auth/google/login?redirect=http%3A%2F%2Flocalhost%3A3000%2Foauth%2Fcallback"
-LOGIN_RESPONSE=$(curl -s -I "$LOGIN_URL")
+LOGIN_RESPONSE=$(curl -s -D - -o /dev/null "$LOGIN_URL")
 if echo "$LOGIN_RESPONSE" | grep -q "302\|Found"; then
     echo "✅ Login endpoint redirects correctly"
     GOOGLE_URL=$(echo "$LOGIN_RESPONSE" | grep -i location | cut -d' ' -f2)

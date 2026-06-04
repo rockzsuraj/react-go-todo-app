@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { adminApi } from '../api/admin';
-import { APIErrorHandler } from '../utils/errorHandler';
 import { logger } from '../services/logger';
 import type { APIResponse } from '../types/api';
+import { APIErrorHandler } from '../utils/errorHandler';
 
 // Define proper types for TanStack Query mutations
 interface RevokeUserVariables {
@@ -17,14 +17,21 @@ interface UnblockUserVariables {
 export const useRevokeUser = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<AxiosResponse<APIResponse<null>>, Error, RevokeUserVariables>({
+  return useMutation<
+    AxiosResponse<APIResponse<null>>,
+    Error,
+    RevokeUserVariables
+  >({
     mutationFn: (variables: RevokeUserVariables) => {
       if (!variables.userID.trim()) {
         throw new Error('User ID is required');
       }
       return adminApi.revokeUser(variables.userID);
     },
-    onSuccess: (_data: AxiosResponse<APIResponse<null>>, variables: RevokeUserVariables) => {
+    onSuccess: (
+      _data: AxiosResponse<APIResponse<null>>,
+      variables: RevokeUserVariables,
+    ) => {
       // Invalidate any user list or auth state if needed
       queryClient.invalidateQueries({ queryKey: ['admin'] });
       if (variables?.userID) {
@@ -47,13 +54,23 @@ export const useRevokeUser = () => {
 export const useUnblockUser = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<AxiosResponse<APIResponse<null>>, Error, UnblockUserVariables>({
-    mutationFn: (variables: UnblockUserVariables) => adminApi.unblockUser(variables.userID),
-    onSuccess: (_data: AxiosResponse<APIResponse<null>>, variables: UnblockUserVariables) => {
+  return useMutation<
+    AxiosResponse<APIResponse<null>>,
+    Error,
+    UnblockUserVariables
+  >({
+    mutationFn: (variables: UnblockUserVariables) =>
+      adminApi.unblockUser(variables.userID),
+    onSuccess: (
+      _data: AxiosResponse<APIResponse<null>>,
+      variables: UnblockUserVariables,
+    ) => {
       // Invalidate any user list or auth state if needed
       queryClient.invalidateQueries({ queryKey: ['admin'] });
       if (variables?.userID) {
-        logger.info('User unblocked successfully:', { userID: variables.userID });
+        logger.info('User unblocked successfully:', {
+          userID: variables.userID,
+        });
       }
     },
     onError: (error: unknown) => {

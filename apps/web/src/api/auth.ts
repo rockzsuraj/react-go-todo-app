@@ -1,6 +1,6 @@
-import { UserResponse } from "../types/user";
-import { APIResponse } from "../types/api";
-import { apiClient } from "./client";
+import type { APIResponse } from '../types/api';
+import type { UserResponse } from '../types/user';
+import { apiClient } from './client';
 
 export const authApi = {
   getMe: async (): Promise<UserResponse> => {

@@ -1,28 +1,33 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CreateTodoInput, Todo, UpdateTodoInput } from '../types/todo';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { todoApi } from '../api';
-import { APIErrorHandler } from '../utils/errorHandler';
 import { logger } from '../services/logger';
+import type { CreateTodoInput, Todo, UpdateTodoInput } from '../types/todo';
+import { APIErrorHandler } from '../utils/errorHandler';
 
 export const useTodos = (
-	enabled: boolean, 
-	page = 1, 
-	limit = 10,
-	sortBy?: string,
-	sortOrder: 'ASC' | 'DESC' = 'ASC',
-	completed?: boolean,
-	assigned?: string
+  enabled: boolean,
+  page = 1,
+  limit = 10,
+  sortBy?: string,
+  sortOrder: 'ASC' | 'DESC' = 'ASC',
+  completed?: boolean,
+  assigned?: string,
 ) =>
   useQuery({
     queryKey: ['todos', page, limit, sortBy, sortOrder, completed, assigned],
     queryFn: async () => {
-      const res = await todoApi.getAll({ 
-        page, 
-        limit, 
-        sortBy, 
-        sortOrder, 
-        completed, 
-        assigned 
+      const res = await todoApi.getAll({
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        completed,
+        assigned,
       });
       return {
         todos: (res.data?.data as Todo[]) ?? [],
@@ -30,14 +35,14 @@ export const useTodos = (
       };
     },
     enabled,
+    placeholderData: keepPreviousData,
   });
 
 export const useCreateTodo = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: CreateTodoInput) =>
-      todoApi.create(payload),
+    mutationFn: (payload: CreateTodoInput) => todoApi.create(payload),
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
@@ -93,8 +98,7 @@ export const useToggleTodoCompleted = () => {
       description: string;
       assigned_to_name: string;
       completed: boolean;
-    }) =>
-      todoApi.update(id, { description, assigned_to_name, completed }),
+    }) => todoApi.update(id, { description, assigned_to_name, completed }),
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });

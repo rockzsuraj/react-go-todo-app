@@ -21,7 +21,7 @@ type MockAuthService struct {
 	GetUserByIDFunc                    func(ctx context.Context, id string) (*models.User, error)
 	StoreRefreshTokenFunc              func(ctx context.Context, refreshID, userID, token string, expiresAt time.Time) error
 	DeleteRefreshTokenFunc             func(ctx context.Context, token string) error
-	ValidateAndRotateRefreshTokenFunc  func(ctx context.Context, token string) (string, error)
+	ValidateAndRotateRefreshTokenFunc  func(ctx context.Context, token string) (string, string, error)
 }
 
 func (m *MockAuthService) HandleGoogleLogin(ctx context.Context, googleUserID, email, name, picture string) (*models.User, error) {
@@ -49,11 +49,31 @@ func (m *MockAuthService) DeleteRefreshToken(ctx context.Context, token string) 
 	return nil
 }
 
-func (m *MockAuthService) ValidateAndRotateRefreshToken(ctx context.Context, token string) (string, error) {
+func (m *MockAuthService) ValidateAndRotateRefreshToken(ctx context.Context, token string) (string, string, error) {
 	if m.ValidateAndRotateRefreshTokenFunc != nil {
 		return m.ValidateAndRotateRefreshTokenFunc(ctx, token)
 	}
-	return "user-123", nil
+	return "user-123", "", nil
+}
+
+func (m *MockAuthService) BlacklistToken(_ context.Context, _ string, _ time.Time) error {
+	return nil
+}
+
+func (m *MockAuthService) IsTokenBlacklisted(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockAuthService) BlacklistAllForUser(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *MockAuthService) IsUserBlacklisted(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
+func (m *MockAuthService) UnblockUser(_ context.Context, _ string) error {
+	return nil
 }
 
 // --- Test Refresh Token Flow ---
@@ -64,11 +84,11 @@ func TestRefreshToken_ValidToken(t *testing.T) {
 	
 	// Mock service
 	mockService := &MockAuthService{
-		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, error) {
+		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, string, error) {
 			if token != refreshToken {
 				t.Errorf("Expected token %s, got %s", refreshToken, token)
 			}
-			return userID, nil
+			return userID, "", nil
 		},
 		GetUserByIDFunc: func(ctx context.Context, id string) (*models.User, error) {
 			if id != userID {
@@ -99,18 +119,21 @@ func TestRefreshToken_ValidToken(t *testing.T) {
 	}
 
 	// Check response contains new access token
-	var response map[string]string
-	if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+	var apiResp struct {
+		Success bool `json:"success"`
+		Data    map[string]string `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&apiResp); err != nil {
 		t.Fatal(err)
 	}
 
-	if response["access_token"] == "" {
+	if apiResp.Data["access_token"] == "" {
 		t.Error("Expected access_token in response")
 	}
 
 	// Verify the new access token is valid JWT
-	token, err := jwt.Parse(response["access_token"], func(token *jwt.Token) (interface{}, error) {
-		return []byte("test-secret"), nil // This would need to match actual JWT secret
+	token, err := jwt.Parse(apiResp.Data["access_token"], func(token *jwt.Token) (interface{}, error) {
+		return []byte("dev-jwt-secret"), nil // This would need to match actual JWT secret
 	})
 	if err != nil {
 		t.Errorf("Invalid JWT token: %v", err)
@@ -127,8 +150,8 @@ func TestRefreshToken_MobileHeader(t *testing.T) {
 	
 	// Mock service
 	mockService := &MockAuthService{
-		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, error) {
-			return userID, nil
+		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, string, error) {
+			return userID, "", nil
 		},
 		GetUserByIDFunc: func(ctx context.Context, id string) (*models.User, error) {
 			return &models.User{
@@ -151,12 +174,15 @@ func TestRefreshToken_MobileHeader(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	var response map[string]string
-	if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+	var apiResp struct {
+		Success bool `json:"success"`
+		Data    map[string]string `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&apiResp); err != nil {
 		t.Fatal(err)
 	}
 
-	if response["access_token"] == "" {
+	if apiResp.Data["access_token"] == "" {
 		t.Error("Expected access_token in response")
 	}
 }
@@ -164,8 +190,8 @@ func TestRefreshToken_MobileHeader(t *testing.T) {
 func TestRefreshToken_InvalidToken(t *testing.T) {
 	// Mock service that returns error for invalid token
 	mockService := &MockAuthService{
-		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, error) {
-			return "", jwt.ErrTokenUnverifiable
+		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, string, error) {
+			return "", "", jwt.ErrTokenUnverifiable
 		},
 	}
 	InitAuthHandlers(mockService)
@@ -189,9 +215,9 @@ func TestRefreshToken_InvalidToken(t *testing.T) {
 func TestRefreshToken_NoToken(t *testing.T) {
 	// Mock service (should not be called)
 	mockService := &MockAuthService{
-		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, error) {
+		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, string, error) {
 			t.Fatal("ValidateAndRotateRefreshToken should not be called when no token provided")
-			return "", nil
+			return "", "", nil
 		},
 	}
 	InitAuthHandlers(mockService)
@@ -211,8 +237,8 @@ func TestRefreshToken_NoToken(t *testing.T) {
 func TestRefreshToken_ExpiredToken(t *testing.T) {
 	// Mock service that simulates expired token
 	mockService := &MockAuthService{
-		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, error) {
-			return "", jwt.ErrTokenExpired
+		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, string, error) {
+			return "", "", jwt.ErrTokenExpired
 		},
 	}
 	InitAuthHandlers(mockService)
@@ -328,22 +354,27 @@ func TestAuthMe_AuthenticatedUser(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	var response map[string]interface{}
-	if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+	var apiResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			User map[string]interface{} `json:"user"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&apiResp); err != nil {
 		t.Fatal(err)
 	}
 
-	user, ok := response["user"].(map[string]interface{})
-	if !ok {
+	user := apiResp.Data.User
+	if user == nil {
 		t.Fatal("Expected user object in response")
 	}
 
-	if user["ID"] != expectedUser.ID {
-		t.Errorf("Expected user ID %s, got %v", expectedUser.ID, user["ID"])
+	if user["id"] != expectedUser.ID {
+		t.Errorf("Expected user ID %s, got %v", expectedUser.ID, user["id"])
 	}
 
-	if user["Email"] != expectedUser.Email {
-		t.Errorf("Expected user email %s, got %v", expectedUser.Email, user["Email"])
+	if user["email"] != expectedUser.Email {
+		t.Errorf("Expected user email %s, got %v", expectedUser.Email, user["email"])
 	}
 }
 

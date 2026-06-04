@@ -17,14 +17,14 @@ import (
 // --- Mock Service ---
 
 type MockTodoService struct {
-	GetAllFunc func(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.Todo, int, error)
+	GetAllFunc func(ctx context.Context, userID uuid.UUID, limit, offset int, sortBy, sortOrder string, filterCompleted *bool, filterAssigned string) ([]models.Todo, int, error)
 	CreateFunc func(ctx context.Context, userID uuid.UUID, assignedToName, description string) error
 	UpdateFunc func(ctx context.Context, userID uuid.UUID, id int, assignedToName, description string, completed bool) error
 	DeleteFunc func(ctx context.Context, userID uuid.UUID, id int) error
 }
 
-func (m *MockTodoService) GetAll(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.Todo, int, error) {
-	return m.GetAllFunc(ctx, userID, limit, offset)
+func (m *MockTodoService) GetAll(ctx context.Context, userID uuid.UUID, limit, offset int, sortBy, sortOrder string, filterCompleted *bool, filterAssigned string) ([]models.Todo, int, error) {
+	return m.GetAllFunc(ctx, userID, limit, offset, sortBy, sortOrder, filterCompleted, filterAssigned)
 }
 
 func (m *MockTodoService) Create(ctx context.Context, userID uuid.UUID, assignedToName, description string) error {
@@ -54,7 +54,7 @@ func TestGetTodos(t *testing.T) {
 
 	// Mock Service
 	mockService := &MockTodoService{
-		GetAllFunc: func(ctx context.Context, uid uuid.UUID, limit, offset int) ([]models.Todo, int, error) {
+		GetAllFunc: func(ctx context.Context, uid uuid.UUID, limit, offset int, sortBy, sortOrder string, filterCompleted *bool, filterAssigned string) ([]models.Todo, int, error) {
 			if uid != userID {
 				t.Errorf("Expected userID %s, got %s", userID, uid)
 			}
