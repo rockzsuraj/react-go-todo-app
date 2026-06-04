@@ -43,16 +43,25 @@ func main() {
 		Addr: redisAddr,
 	})
 	if err := redisClient.Ping(ctx).Err(); err != nil {
-		logger.Error("redis connection failed", "error", err)
-		os.Exit(1)
+		logger.Warn("redis unavailable, token blacklisting disabled", "error", err)
+		redisClient = nil
 	}
-	defer redisClient.Close()
+	defer func() {
+		if redisClient != nil {
+			redisClient.Close()
+		}
+	}()
 
 	// Repositories
 	todoRepo := repository.NewTodoRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
-	blacklistRepo := repository.NewRedisBlacklistRepository(redisClient)
+	var blacklistRepo services.TokenBlacklistRepository
+	if redisClient != nil {
+		blacklistRepo = repository.NewRedisBlacklistRepository(redisClient)
+	} else {
+		blacklistRepo = &repository.NoopBlacklistRepository{}
+	}
 
 	// Services
 	todoService := services.NewTodoService(todoRepo)
