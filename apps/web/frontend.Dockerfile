@@ -49,6 +49,11 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine AS production
 
+ARG REACT_APP_API_URL
+ARG BACKEND_HOST
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV BACKEND_HOST=$BACKEND_HOST
+
 COPY --from=builder /app/build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf.template
 
@@ -58,4 +63,4 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
 
-CMD ["sh", "-c", "envsubst '$REACT_APP_API_URL $BACKEND_HOST' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "envsubst '${REACT_APP_API_URL} ${BACKEND_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
