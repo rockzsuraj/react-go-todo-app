@@ -76,7 +76,11 @@ func sendJSONError(w http.ResponseWriter, status int, code, message string) {
 }
 
 func safeMessage() string {
-	if os.Getenv("ENV") == "development" {
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = os.Getenv("NODE_ENV")
+	}
+	if env == "development" {
 		return "Server error (check logs)"
 	}
 	return "Internal server error"

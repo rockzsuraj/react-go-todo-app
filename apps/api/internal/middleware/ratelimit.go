@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -12,8 +13,8 @@ type RateLimiter struct {
 }
 
 type visitor struct {
-	count    int
-	lastSeen time.Time
+	count       int
+	windowStart time.Time
 }
 
 func NewRateLimiter() *RateLimiter {
@@ -34,20 +35,23 @@ func (rl *RateLimiter) RateLimit(limit int, window time.Duration) func(http.Hand
 			rl.mu.Lock()
 			v, ok := rl.visitors[ip]
 			if !ok {
-				v = &visitor{}
+				v = &visitor{windowStart: now}
 				rl.visitors[ip] = v
 			}
 
-			if now.Sub(v.lastSeen) > window {
+			if now.Sub(v.windowStart) >= window {
 				v.count = 0
+				v.windowStart = now
 			}
 
 			v.count++
-			v.lastSeen = now
 			count := v.count
+			retryAfter := time.Until(v.windowStart.Add(window))
 			rl.mu.Unlock()
 
 			if count > limit {
+				retrySeconds := max(1, int(retryAfter.Round(time.Second)/time.Second))
+				w.Header().Set("Retry-After", strconv.Itoa(retrySeconds))
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
 				return
 			}
@@ -62,7 +66,7 @@ func (rl *RateLimiter) cleanup() {
 		time.Sleep(time.Minute)
 		rl.mu.Lock()
 		for ip, v := range rl.visitors {
-			if time.Since(v.lastSeen) > 3*time.Minute {
+			if time.Since(v.windowStart) > 3*time.Minute {
 				delete(rl.visitors, ip)
 			}
 		}

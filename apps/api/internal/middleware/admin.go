@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -24,11 +25,11 @@ func AdminOnly(jwtSecret string) func(http.Handler) http.Handler {
 			}
 
 			token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, nil
+				if t.Method != jwt.SigningMethodHS256 {
+					return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 				}
 				return []byte(jwtSecret), nil
-			})
+			}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 			if err != nil || !token.Valid {
 				SendError(w, ErrUnauthorized)
 				return

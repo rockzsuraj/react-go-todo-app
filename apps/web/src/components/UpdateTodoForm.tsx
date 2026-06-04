@@ -41,44 +41,46 @@ function UpdateTodoForm({ todo, onCancel }: Props) {
   }
 
   return (
-    <div className="mt-3 p-3 border rounded">
-      <h6>Update Todo</h6>
-      <div className="mb-3">
-        <label htmlFor="update-assigned" className="form-label">
-          Assigned
-        </label>
-        <input
-          id="update-assigned"
-          value={assigned}
-          type="text"
-          className="form-control"
-          required
-          onChange={handleChangeAssigned}
-        />
+    <div className="todo-edit-form">
+      <div className="todo-form-grid">
+        <div className="todo-form-field">
+          <label htmlFor="update-assigned">
+            <i className="bi bi-person" />
+            Assigned to
+          </label>
+          <input
+            id="update-assigned"
+            value={assigned}
+            type="text"
+            required
+            onChange={handleChangeAssigned}
+          />
+        </div>
+        <div className="todo-form-field todo-form-field--wide">
+          <label htmlFor="update-description">
+            <i className="bi bi-text-left" />
+            Task details
+          </label>
+          <textarea
+            id="update-description"
+            value={description}
+            rows={3}
+            required
+            onChange={handleChangeDescription}
+          />
+        </div>
       </div>
-      <div className="mb-3">
-        <label htmlFor="update-description" className="form-label">
-          Description
-        </label>
-        <textarea
-          id="update-description"
-          value={description}
-          rows={3}
-          className="form-control"
-          required
-          onChange={handleChangeDescription}
-        />
-      </div>
-      <div className="d-flex gap-2">
+      <div className="todo-form-actions">
         <button
           onClick={submitUpdate}
           type="button"
-          className="btn btn-success"
+          className="todo-save-action"
           disabled={updateTodoMutation.isPending}
         >
-          {updateTodoMutation.isPending ? 'Updating...' : 'Update'}
+          <i className="bi bi-check2" />
+          {updateTodoMutation.isPending ? 'Saving...' : 'Save changes'}
         </button>
-        <button onClick={onCancel} type="button" className="btn btn-secondary">
+        <button onClick={onCancel} type="button" className="todo-cancel-action">
           Cancel
         </button>
       </div>

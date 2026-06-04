@@ -9,6 +9,11 @@ interface FailedRequest {
   reject: (reason?: unknown) => void;
 }
 
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+  _renderWakeRetries?: number;
+}
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: '/api',
   withCredentials: true,
@@ -19,6 +24,13 @@ const refreshClient = axios.create({
   baseURL: '/api',
   withCredentials: true,
 });
+
+const renderWakeRetryDelays = [2_000, 5_000, 10_000, 20_000];
+
+export const isRenderHibernateRateLimit = (
+  status: number | undefined,
+  routing: unknown,
+): boolean => status === 429 && routing === 'hibernate-rate-limited';
 
 let isRefreshing = false;
 let failedQueue: FailedRequest[] = [];
@@ -42,9 +54,21 @@ apiClient.interceptors.response.use(
       return Promise.reject(err);
     }
 
-    const originalRequest = err.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    };
+    const originalRequest = err.config as RetryableRequestConfig;
+
+    // Render free web services can return this response while waking from
+    // hibernation. Retry only this platform-generated 429.
+    const renderRouting = err.response?.headers?.['x-render-routing'];
+    if (isRenderHibernateRateLimit(err.response?.status, renderRouting)) {
+      const retryCount = originalRequest._renderWakeRetries ?? 0;
+      if (retryCount < renderWakeRetryDelays.length) {
+        originalRequest._renderWakeRetries = retryCount + 1;
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, renderWakeRetryDelays[retryCount]),
+        );
+        return apiClient(originalRequest);
+      }
+    }
 
     // Pass through non-401s immediately.
     if (err.response?.status !== 401 || originalRequest._retry) {

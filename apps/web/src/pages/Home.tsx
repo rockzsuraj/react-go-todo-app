@@ -53,6 +53,9 @@ export default function Home() {
 
   // ✅ SAFE META
   const { total = 0 } = todosData?.meta ?? {};
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const completedCount = todos.filter((todo) => todo.completed).length;
+  const activeCount = todos.length - completedCount;
 
   const deleteTodoMutation = useDeleteTodo();
   const toggleTodoCompletedMutation = useToggleTodoCompleted();
@@ -104,209 +107,256 @@ export default function Home() {
   };
   // ⏳ Todos loading
   if (isLoading) {
-    return <div className="container mt-5">Loading todos...</div>;
+    return (
+      <div className="todo-page-shell">
+        <div className="todo-loading-state">
+          <span className="spinner-border text-primary" aria-hidden="true" />
+          <span>Loading your tasks...</span>
+        </div>
+      </div>
+    );
   }
 
   // ❌ Error
   if (isError) {
     return (
-      <div className="container mt-5 text-danger">Failed to load todos</div>
+      <div className="todo-page-shell">
+        <div className="todo-error-state">
+          <i className="bi bi-exclamation-triangle" />
+          <div>
+            <strong>Could not load your tasks</strong>
+            <span>Please refresh the page and try again.</span>
+          </div>
+        </div>
+      </div>
     );
   }
 
   // ✅ LOGGED IN UI
   return (
-    <div className="container mt-5">
-      <div className="card glass-panel border-0">
-        <div className="card-header premium-header text-white">
-          <div className="d-flex justify-content-between align-items-center">
-            <h5 className="mb-0 fw-semibold d-flex align-items-center gap-2">
-              <i className="bi bi-list-task fs-4"></i>
-              My Todos
-            </h5>
+    <div className="todo-page-shell">
+      <section className="todo-hero">
+        <div>
+          <span className="todo-eyebrow">Personal workspace</span>
+          <h1>My tasks</h1>
+          <p>Keep work moving and make today feel manageable.</p>
+        </div>
+        <button
+          type="button"
+          className="todo-primary-action"
+          onClick={() => setShowAddTodoForm((prev) => !prev)}
+          aria-expanded={showAddTodoForm}
+        >
+          <i className={`bi ${showAddTodoForm ? 'bi-x-lg' : 'bi-plus-lg'}`} />
+          {showAddTodoForm ? 'Close form' : 'Add task'}
+        </button>
+      </section>
 
-            <button
-              type="button"
-              className="btn btn-light btn-sm fw-semibold rounded-pill px-3 py-1.5 shadow-sm"
-              onClick={() => setShowAddTodoForm((prev) => !prev)}
-            >
-              <i
-                className={`bi ${showAddTodoForm ? 'bi-x-lg' : 'bi-plus-lg'} me-1`}
-              ></i>
-              {showAddTodoForm ? 'Close' : 'New Todo'}
-            </button>
+      <section className="todo-stats" aria-label="Task summary">
+        <div className="todo-stat-card todo-stat-card--total">
+          <span className="todo-stat-icon">
+            <i className="bi bi-collection" />
+          </span>
+          <div>
+            <strong>{total}</strong>
+            <span>Total tasks</span>
+          </div>
+        </div>
+        <div className="todo-stat-card todo-stat-card--active">
+          <span className="todo-stat-icon">
+            <i className="bi bi-lightning-charge" />
+          </span>
+          <div>
+            <strong>{activeCount}</strong>
+            <span>Active on this page</span>
+          </div>
+        </div>
+        <div className="todo-stat-card todo-stat-card--done">
+          <span className="todo-stat-icon">
+            <i className="bi bi-check2-circle" />
+          </span>
+          <div>
+            <strong>{completedCount}</strong>
+            <span>Done on this page</span>
+          </div>
+        </div>
+      </section>
+
+      {showAddTodoForm && (
+        <section className="todo-create-panel">
+          <div className="todo-section-heading">
+            <div>
+              <span className="todo-eyebrow">New task</span>
+              <h2>What needs to get done?</h2>
+            </div>
+          </div>
+          <NewTodoForm onSuccess={() => setShowAddTodoForm(false)} />
+        </section>
+      )}
+
+      <section className="todo-workspace">
+        <div className="todo-toolbar">
+          <div className="todo-toolbar-heading">
+            <div>
+              <span className="todo-eyebrow">Task list</span>
+              <h2>Stay on top of it</h2>
+            </div>
+
+            {(filterCompleted !== undefined || searchInput !== '') && (
+              <button
+                type="button"
+                className="btn-reset-filters"
+                onClick={clearFilters}
+              >
+                <i className="bi bi-arrow-counterclockwise" />
+                Reset
+              </button>
+            )}
+          </div>
+
+          <div className="todo-filter-grid">
+            {/* Status Tabs */}
+            <div className="todo-filter-field">
+              <span className="todo-filter-label">Status</span>
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={`segmented-pill ${filterCompleted === undefined ? 'active' : ''}`}
+                  onClick={() => {
+                    setFilterCompleted(undefined);
+                    handleFilterChange();
+                  }}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`segmented-pill ${filterCompleted === false ? 'active' : ''}`}
+                  onClick={() => {
+                    setFilterCompleted(false);
+                    handleFilterChange();
+                  }}
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  className={`segmented-pill ${filterCompleted === true ? 'active' : ''}`}
+                  onClick={() => {
+                    setFilterCompleted(true);
+                    handleFilterChange();
+                  }}
+                >
+                  Completed
+                </button>
+              </div>
+            </div>
+
+            {/* Search Assignee */}
+            <div className="todo-filter-field">
+              <label className="todo-filter-label" htmlFor="assignee-search">
+                Assignee
+              </label>
+              <div className="modern-input-group">
+                <input
+                  id="assignee-search"
+                  type="text"
+                  className="form-control modern-input"
+                  placeholder="Search by assignee name..."
+                  value={searchInput}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value);
+                  }}
+                />
+                {isFetching ? (
+                  <output
+                    className="spinner-border spinner-border-sm text-indigo modern-input-icon"
+                    style={{ borderWidth: '2px' }}
+                  >
+                    <span className="visually-hidden">Loading...</span>
+                  </output>
+                ) : (
+                  <i className="bi bi-search modern-input-icon"></i>
+                )}
+              </div>
+            </div>
+
+            {/* Sort Controls */}
+            <div className="todo-filter-field">
+              <label className="todo-filter-label" htmlFor="sort-order-select">
+                Sort by
+              </label>
+              <div className="d-flex gap-2">
+                <div className="modern-input-group flex-grow-1">
+                  <select
+                    id="sort-order-select"
+                    className="form-select modern-input modern-select"
+                    value={sortBy}
+                    onChange={(e) => handleSort(e.target.value)}
+                  >
+                    <option value="created_at">Created Date</option>
+                    <option value="updated_at">Updated Date</option>
+                    <option value="description">Description</option>
+                    <option value="assigned_to_name">Assigned To</option>
+                  </select>
+                  <i className="bi bi-sort-down modern-input-icon"></i>
+                </div>
+
+                <button
+                  type="button"
+                  className="sort-direction-btn"
+                  title={
+                    sortOrder === 'ASC' ? 'Sort Ascending' : 'Sort Descending'
+                  }
+                  onClick={() => {
+                    setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+                    setPage(1);
+                  }}
+                >
+                  <i
+                    className={`bi ${sortOrder === 'ASC' ? 'bi-sort-alpha-up' : 'bi-sort-alpha-down'}`}
+                  ></i>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="card-body p-4">
-          {/* New Todo Form */}
-          {showAddTodoForm && (
-            <div className="mb-4 p-3 bg-light rounded-4 border border-light-subtle animate-hover">
-              <NewTodoForm onSuccess={() => setShowAddTodoForm(false)} />
-            </div>
-          )}
-
-          {/* Modern Filters Section */}
-          <div className="mb-5 p-4 rounded-4 bg-light bg-opacity-50 border border-light-subtle">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h6 className="filter-section-title mb-0">
-                <i className="bi bi-funnel-fill me-2 text-indigo"></i>
-                Filter & Sort Tasks
-              </h6>
-
-              {(filterCompleted !== undefined || searchInput !== '') && (
-                <button
-                  type="button"
-                  className="btn-reset-filters"
-                  onClick={clearFilters}
-                >
-                  <i className="bi bi-arrow-counterclockwise"></i>
-                  Reset Filters
-                </button>
-              )}
-            </div>
-
-            <div className="row g-4 align-items-end">
-              {/* Status Tabs */}
-              <div className="col-lg-4 col-md-6">
-                <span className="form-label fw-semibold text-secondary small mb-2 d-block">
-                  Task Status
-                </span>
-                <div className="segmented-control">
-                  <button
-                    type="button"
-                    className={`segmented-pill ${filterCompleted === undefined ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterCompleted(undefined);
-                      handleFilterChange();
-                    }}
-                  >
-                    All
-                  </button>
-                  <button
-                    type="button"
-                    className={`segmented-pill ${filterCompleted === false ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterCompleted(false);
-                      handleFilterChange();
-                    }}
-                  >
-                    Active
-                  </button>
-                  <button
-                    type="button"
-                    className={`segmented-pill ${filterCompleted === true ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterCompleted(true);
-                      handleFilterChange();
-                    }}
-                  >
-                    Completed
-                  </button>
-                </div>
-              </div>
-
-              {/* Search Assignee */}
-              <div className="col-lg-4 col-md-6">
-                <label
-                  className="form-label fw-semibold text-secondary small mb-2"
-                  htmlFor="assignee-search"
-                >
-                  Assigned To
-                </label>
-                <div className="modern-input-group">
-                  <input
-                    id="assignee-search"
-                    type="text"
-                    className="form-control modern-input"
-                    placeholder="Search by assignee name..."
-                    value={searchInput}
-                    onChange={(e) => {
-                      setSearchInput(e.target.value);
-                    }}
-                  />
-                  {isFetching ? (
-                    <output
-                      className="spinner-border spinner-border-sm text-indigo modern-input-icon"
-                      style={{ borderWidth: '2px' }}
-                    >
-                      <span className="visually-hidden">Loading...</span>
-                    </output>
-                  ) : (
-                    <i className="bi bi-search modern-input-icon"></i>
-                  )}
-                </div>
-              </div>
-
-              {/* Sort Controls */}
-              <div className="col-lg-4 col-md-12">
-                <label
-                  className="form-label fw-semibold text-secondary small mb-2"
-                  htmlFor="sort-order-select"
-                >
-                  Sort Order
-                </label>
-                <div className="d-flex gap-2">
-                  <div className="modern-input-group flex-grow-1">
-                    <select
-                      id="sort-order-select"
-                      className="form-select modern-input modern-select"
-                      value={sortBy}
-                      onChange={(e) => handleSort(e.target.value)}
-                    >
-                      <option value="created_at">Created Date</option>
-                      <option value="updated_at">Updated Date</option>
-                      <option value="description">Description</option>
-                      <option value="assigned_to_name">Assigned To</option>
-                    </select>
-                    <i className="bi bi-sort-down modern-input-icon"></i>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="sort-direction-btn"
-                    title={
-                      sortOrder === 'ASC' ? 'Sort Ascending' : 'Sort Descending'
-                    }
-                    onClick={() => {
-                      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
-                      setPage(1);
-                    }}
-                  >
-                    <i
-                      className={`bi ${sortOrder === 'ASC' ? 'bi-sort-alpha-up' : 'bi-sort-alpha-down'}`}
-                    ></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Results & Summary */}
-            <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top border-light-subtle">
-              <div className="results-info-badge">
-                <i className="bi bi-info-circle-fill me-2"></i>
-                Total Tasks: {total}
-              </div>
-
-              {total > limit && (
-                <div className="text-secondary small">
-                  Page <strong>{page}</strong> of {Math.ceil(total / limit)}
-                </div>
-              )}
-            </div>
-          </div>
-
+        <div className="todo-list-region">
           <TodoTable
             todos={todos}
             deleteTodo={handleDeleteTodo}
             toggleTodoCompleted={handleToggleTodoCompleted}
             isDeleting={deleteTodoMutation.isPending}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSort={handleSort}
           />
         </div>
-      </div>
+
+        {totalPages > 1 && (
+          <nav className="todo-pagination" aria-label="Task pages">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1 || isFetching}
+            >
+              <i className="bi bi-arrow-left" />
+              Previous
+            </button>
+            <span>
+              Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
+              disabled={page === totalPages || isFetching}
+            >
+              Next
+              <i className="bi bi-arrow-right" />
+            </button>
+          </nav>
+        )}
+      </section>
     </div>
   );
 }

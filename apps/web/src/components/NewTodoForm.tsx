@@ -28,16 +28,16 @@ function NewTodoForm({ onSuccess }: { onSuccess?: () => void }) {
   }
 
   return (
-    <div className="mt-5">
-      <form onSubmit={handleSubmit}>
-        <div className="mb-3">
-          <label htmlFor="assigned" className="form-label">
-            Assigned To
+    <form className="todo-form" onSubmit={handleSubmit}>
+      <div className="todo-form-grid">
+        <div className="todo-form-field">
+          <label htmlFor="assigned">
+            <i className="bi bi-person" />
+            Assigned to
           </label>
           <input
             id="assigned"
             type="text"
-            className="form-control"
             value={assignedToName}
             required
             onChange={(e) => setAssignedToName(e.target.value)}
@@ -45,29 +45,33 @@ function NewTodoForm({ onSuccess }: { onSuccess?: () => void }) {
           />
         </div>
 
-        <div className="mb-3">
-          <label htmlFor="description" className="form-label">
-            Description
+        <div className="todo-form-field todo-form-field--wide">
+          <label htmlFor="description">
+            <i className="bi bi-text-left" />
+            Task details
           </label>
           <textarea
             id="description"
             rows={3}
-            className="form-control"
             value={description}
             required
             onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe what needs to be done..."
           />
         </div>
+      </div>
 
+      <div className="todo-form-actions">
         <button
           type="submit"
-          className="btn btn-primary mt-3"
+          className="todo-primary-action"
           disabled={createTodoMutation.isPending}
         >
-          {createTodoMutation.isPending ? 'Adding…' : 'Add Todo'}
+          <i className="bi bi-plus-lg" />
+          {createTodoMutation.isPending ? 'Adding...' : 'Add task'}
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 }
 

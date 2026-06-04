@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -14,7 +16,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func SetupRouter(authService services.AuthServicer) http.Handler {
+type ReadinessCheck func(context.Context) error
+
+func SetupRouter(authService services.AuthServicer, readinessCheck ReadinessCheck) http.Handler {
 	r := chi.NewRouter()
 	cfg := config.LoadAppConfig()
 
@@ -31,8 +35,24 @@ func SetupRouter(authService services.AuthServicer) http.Handler {
 
 	// ===== HEALTH (Public) =====
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"healthy"}`))
+	})
+	r.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if readinessCheck != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+			defer cancel()
+			if err := readinessCheck(ctx); err != nil {
+				slog.Error("readiness check failed", "error", err)
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_ = json.NewEncoder(w).Encode(map[string]string{"status": "unhealthy"})
+				return
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
 	})
 
 	// ===== ROOT ROUTE =====

@@ -80,12 +80,11 @@ func authenticateJWT(r *http.Request, secret string, authService services.AuthSe
 
 	// Parse and Validate the Token
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-		// Ensure the signing method is HMAC HS256
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		if t.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return []byte(secret), nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
 		slog.Warn("JWT parse error", "error", err)
@@ -102,13 +101,23 @@ func authenticateJWT(r *http.Request, secret string, authService services.AuthSe
 		if sub, ok := claims["sub"].(string); ok && sub != "" {
 			// Check if token is blacklisted by jti
 			if jti, ok := claims["jti"].(string); ok && jti != "" {
-				if blacklisted, err := authService.IsTokenBlacklisted(r.Context(), jti); err == nil && blacklisted {
+				blacklisted, err := authService.IsTokenBlacklisted(r.Context(), jti)
+				if err != nil {
+					slog.Error("failed to check JWT blacklist", "error", err)
+					return "", false
+				}
+				if blacklisted {
 					slog.Warn("JWT token is blacklisted", "jti", jti)
 					return "", false
 				}
 			}
 			// Check if user is blacklisted (admin revoke)
-			if userBlacklisted, err := authService.IsUserBlacklisted(r.Context(), sub); err == nil && userBlacklisted {
+			userBlacklisted, err := authService.IsUserBlacklisted(r.Context(), sub)
+			if err != nil {
+				slog.Error("failed to check user blacklist", "error", err)
+				return "", false
+			}
+			if userBlacklisted {
 				slog.Warn("JWT user is blacklisted", "sub", sub)
 				return "", false
 			}
@@ -140,7 +149,7 @@ func WithUserID(ctx context.Context, userID string) context.Context {
 func isValidAPIKey(key string) bool {
 	validKeys := os.Getenv("API_KEYS")
 	if validKeys == "" {
-		validKeys = "dev-key-12345"
+		return false
 	}
 	for _, k := range strings.Split(validKeys, ",") {
 		if strings.TrimSpace(k) == key {

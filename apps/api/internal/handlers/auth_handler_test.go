@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -18,10 +19,10 @@ import (
 // --- Mock AuthService ---
 
 type MockAuthService struct {
-	GetUserByIDFunc                    func(ctx context.Context, id string) (*models.User, error)
-	StoreRefreshTokenFunc              func(ctx context.Context, refreshID, userID, token string, expiresAt time.Time) error
-	DeleteRefreshTokenFunc             func(ctx context.Context, token string) error
-	ValidateAndRotateRefreshTokenFunc  func(ctx context.Context, token string) (string, string, error)
+	GetUserByIDFunc                   func(ctx context.Context, id string) (*models.User, error)
+	StoreRefreshTokenFunc             func(ctx context.Context, refreshID, userID, token string, expiresAt time.Time) error
+	DeleteRefreshTokenFunc            func(ctx context.Context, token string) error
+	ValidateAndRotateRefreshTokenFunc func(ctx context.Context, token string) (string, string, error)
 }
 
 func (m *MockAuthService) HandleGoogleLogin(ctx context.Context, googleUserID, email, name, picture string) (*models.User, error) {
@@ -78,10 +79,56 @@ func (m *MockAuthService) UnblockUser(_ context.Context, _ string) error {
 
 // --- Test Refresh Token Flow ---
 
+func TestGoogleLoginSetsOAuthStateCookie(t *testing.T) {
+	req := httptest.NewRequest("GET", "/api/auth/google/login", nil)
+	rr := httptest.NewRecorder()
+
+	GoogleLogin(rr, req)
+
+	if rr.Code != http.StatusFound {
+		t.Fatalf("expected redirect, got %d", rr.Code)
+	}
+
+	location, err := url.Parse(rr.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := location.Query().Get("state")
+	if state == "" {
+		t.Fatal("expected OAuth state in redirect")
+	}
+
+	var stateCookie *http.Cookie
+	for _, cookie := range rr.Result().Cookies() {
+		if cookie.Name == oauthStateCookieName {
+			stateCookie = cookie
+			break
+		}
+	}
+	if stateCookie == nil || stateCookie.Value != state {
+		t.Fatal("expected matching OAuth state cookie")
+	}
+	if !stateCookie.HttpOnly || stateCookie.SameSite != http.SameSiteLaxMode {
+		t.Fatal("expected protected OAuth state cookie")
+	}
+}
+
+func TestGoogleCallbackRejectsInvalidOAuthState(t *testing.T) {
+	req := httptest.NewRequest("GET", "/api/auth/callback/google?code=test&state=attacker-state", nil)
+	req.AddCookie(&http.Cookie{Name: oauthStateCookieName, Value: "expected-state"})
+	rr := httptest.NewRecorder()
+
+	GoogleCallback(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected invalid state to return 401, got %d", rr.Code)
+	}
+}
+
 func TestRefreshToken_ValidToken(t *testing.T) {
 	userID := uuid.New().String()
 	refreshToken := "valid-refresh-token"
-	
+
 	// Mock service
 	mockService := &MockAuthService{
 		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, string, error) {
@@ -120,7 +167,7 @@ func TestRefreshToken_ValidToken(t *testing.T) {
 
 	// Check response contains new access token
 	var apiResp struct {
-		Success bool `json:"success"`
+		Success bool              `json:"success"`
 		Data    map[string]string `json:"data"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&apiResp); err != nil {
@@ -147,7 +194,7 @@ func TestRefreshToken_ValidToken(t *testing.T) {
 func TestRefreshToken_MobileHeader(t *testing.T) {
 	userID := uuid.New().String()
 	refreshToken := "mobile-refresh-token"
-	
+
 	// Mock service
 	mockService := &MockAuthService{
 		ValidateAndRotateRefreshTokenFunc: func(ctx context.Context, token string) (string, string, error) {
@@ -175,7 +222,7 @@ func TestRefreshToken_MobileHeader(t *testing.T) {
 	}
 
 	var apiResp struct {
-		Success bool `json:"success"`
+		Success bool              `json:"success"`
 		Data    map[string]string `json:"data"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&apiResp); err != nil {
@@ -261,7 +308,7 @@ func TestRefreshToken_ExpiredToken(t *testing.T) {
 
 func TestLogout_WithRefreshToken(t *testing.T) {
 	refreshToken := "test-refresh-token"
-	
+
 	// Mock service
 	mockService := &MockAuthService{
 		DeleteRefreshTokenFunc: func(ctx context.Context, token string) error {

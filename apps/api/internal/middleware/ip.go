@@ -6,27 +6,36 @@ import (
 	"strings"
 )
 
-// GetClientIP extracts the real client IP address, respecting reverse proxies.
+// GetClientIP trusts forwarding headers only when the direct peer is a local or
+// private-network reverse proxy. This prevents public clients from spoofing
+// their identity to bypass IP-based controls.
 func GetClientIP(r *http.Request) string {
-	// 1. Check X-Forwarded-For header (standard for most proxies/load balancers)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For can contain multiple comma-separated IPs (client, proxy1, proxy2).
-		// The first one is the client's original IP.
-		ips := strings.Split(xff, ",")
-		if len(ips) > 0 {
-			ip := strings.TrimSpace(ips[0])
-			if ip != "" {
-				return ip
+	remoteIP := parseIP(r.RemoteAddr)
+	if remoteIP == nil {
+		return r.RemoteAddr
+	}
+
+	if remoteIP.IsPrivate() || remoteIP.IsLoopback() {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			for _, candidate := range strings.Split(xff, ",") {
+				if ip := net.ParseIP(strings.TrimSpace(candidate)); ip != nil {
+					return ip.String()
+				}
 			}
+		}
+
+		if ip := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); ip != nil {
+			return ip.String()
 		}
 	}
 
-	// 2. Check X-Real-IP header (common alternative)
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
+	return remoteIP.String()
+}
 
-	// 3. Fallback to RemoteAddr
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return ip
+func parseIP(address string) net.IP {
+	host, _, err := net.SplitHostPort(address)
+	if err == nil {
+		return net.ParseIP(host)
+	}
+	return net.ParseIP(address)
 }

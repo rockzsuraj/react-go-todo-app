@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -25,6 +26,8 @@ import (
 
 var authService services.AuthServicer
 
+const oauthStateCookieName = "oauth_state"
+
 func InitAuthHandlers(service services.AuthServicer) {
 	authService = service
 }
@@ -32,6 +35,14 @@ func InitAuthHandlers(service services.AuthServicer) {
 /* ===================== UTILS ===================== */
 
 func generateRefreshToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func generateOAuthState() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -55,11 +66,21 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		Endpoint: google.Endpoint,
 	}
 
-	redirect := r.URL.Query().Get("redirect")
-	state := ""
-	if redirect != "" {
-		state = redirect
+	state, err := generateOAuthState()
+	if err != nil {
+		middleware.SendError(w, err)
+		return
 	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    state,
+		Path:     "/api/auth/callback/google",
+		HttpOnly: true,
+		Secure:   appCfg.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   10 * 60,
+	})
 
 	authURL := oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, authURL, http.StatusFound)
@@ -73,7 +94,23 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	// 🔍 Detect mobile client
 	accept := r.Header.Get("Accept")
 	isMobile := strings.Contains(accept, "application/json")
-	slog.Info("callback request", "accept", accept, "isMobile", isMobile, "all_headers", r.Header)
+	slog.Info("callback request", "is_mobile", isMobile)
+
+	stateCookie, err := r.Cookie(oauthStateCookieName)
+	state := r.URL.Query().Get("state")
+	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(state)) != 1 {
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    "",
+		Path:     "/api/auth/callback/google",
+		HttpOnly: true,
+		Secure:   appCfg.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 
 	oauthCfg := &oauth2.Config{
 		ClientID:     appCfg.GoogleClientID,
@@ -133,13 +170,13 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 🔐 Access token (15 min)
+	// 🔐 Access token (7 days)
 	jti := uuid.NewString()
 	claims := jwt.MapClaims{
 		"sub":  user.ID,
 		"jti":  jti,
 		"role": user.Role,
-		"exp":  time.Now().Add(15 * time.Minute).Unix(),
+		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
 	}
 
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -190,7 +227,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   15 * 60,
+		MaxAge:   7 * 24 * 60 * 60,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -243,11 +280,11 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	tokenStr := middleware.ExtractToken(r)
 	if tokenStr != "" {
 		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			if t.Method != jwt.SigningMethodHS256 {
 				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
 			return []byte(appCfg.JWTSecret), nil
-		})
+		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 		if err == nil && token.Valid {
 			if claims, ok := token.Claims.(jwt.MapClaims); ok {
 				if jti, ok := claims["jti"].(string); ok {
@@ -373,7 +410,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		"sub":  userID,
 		"jti":  jti,
 		"role": user.Role,
-		"exp":  time.Now().Add(15 * time.Minute).Unix(),
+		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -392,7 +429,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   appCfg.Env == "production",
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   15 * 60,
+		MaxAge:   7 * 24 * 60 * 60,
 	})
 
 	// 🌐 Web: Rotate refresh token cookie if a new one was generated

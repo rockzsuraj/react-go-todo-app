@@ -18,75 +18,80 @@ function TodoRowItem({
   const [isEditing, setIsEditing] = useState(false);
 
   return (
-    <>
-      <tr className="align-middle">
-        <td>
-          <div className="form-check">
-            <input
-              type="checkbox"
-              className="form-check-input"
-              checked={todo.completed}
-              disabled={isDeleting}
-              onChange={toggleTodoCompleted}
-            />
-          </div>
-        </td>
-        <td>
-          <div
-            className={`fw-semibold ${todo.completed ? 'text-decoration-line-through text-muted' : ''}`}
-          >
-            {todo.description}
-          </div>
-        </td>
-        <td>
-          <div className="d-flex align-items-center gap-2">
-            <div
-              className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
-              style={{ width: '32px', height: '32px', fontSize: '14px' }}
+    <article
+      className={`todo-item ${todo.completed ? 'todo-item--completed' : ''}`}
+    >
+      <div className="todo-item-main">
+        <button
+          type="button"
+          className="todo-check-button"
+          aria-label={
+            todo.completed ? 'Mark task active' : 'Mark task complete'
+          }
+          aria-pressed={todo.completed}
+          disabled={isDeleting}
+          onClick={toggleTodoCompleted}
+        >
+          <i className={`bi ${todo.completed ? 'bi-check-lg' : ''}`} />
+        </button>
+
+        <div className="todo-item-content">
+          <div className="todo-item-topline">
+            <span
+              className={`todo-status ${todo.completed ? 'is-done' : 'is-active'}`}
             >
+              {todo.completed ? 'Completed' : 'Active'}
+            </span>
+            <time dateTime={todo.created_at}>
+              <i className="bi bi-calendar3" />
+              {new Date(todo.created_at).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </time>
+          </div>
+          <h3>{todo.description}</h3>
+          <div className="todo-assignee">
+            <span className="todo-assignee-avatar">
               {todo.assigned_to_name.charAt(0).toUpperCase()}
-            </div>
+            </span>
             <span>{todo.assigned_to_name}</span>
           </div>
-        </td>
-        <td>
-          <small className="text-muted">
-            {new Date(todo.created_at).toLocaleDateString()}
-          </small>
-        </td>
-        <td>
-          <div className="d-flex gap-2">
-            <button
-              type="button"
-              className="btn btn-outline-primary btn-sm"
-              disabled={isDeleting}
-              onClick={() => setIsEditing((v) => !v)}
-            >
-              <i className={`bi ${isEditing ? 'bi-x-lg' : 'bi-pencil'}`}></i>
-            </button>
+        </div>
+      </div>
 
-            <button
-              type="button"
-              onClick={deleteTodo}
-              className="btn btn-outline-danger btn-sm"
-              disabled={isDeleting}
-            >
-              <i
-                className={`bi ${isDeleting ? 'bi-hourglass-split' : 'bi-trash'}`}
-              ></i>
-            </button>
-          </div>
-        </td>
-      </tr>
+      <div className="todo-item-actions">
+        <button
+          type="button"
+          className="todo-icon-action"
+          disabled={isDeleting}
+          onClick={() => setIsEditing((v) => !v)}
+          aria-label={isEditing ? 'Close edit form' : 'Edit task'}
+        >
+          <i className={`bi ${isEditing ? 'bi-x-lg' : 'bi-pencil'}`} />
+          <span>{isEditing ? 'Close' : 'Edit'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={deleteTodo}
+          className="todo-icon-action todo-icon-action--danger"
+          disabled={isDeleting}
+          aria-label="Delete task"
+        >
+          <i
+            className={`bi ${isDeleting ? 'bi-hourglass-split' : 'bi-trash3'}`}
+          />
+          <span>Delete</span>
+        </button>
+      </div>
 
       {isEditing && (
-        <tr>
-          <td colSpan={5} className="bg-light">
-            <UpdateTodoForm todo={todo} onCancel={() => setIsEditing(false)} />
-          </td>
-        </tr>
+        <div className="todo-item-editor">
+          <UpdateTodoForm todo={todo} onCancel={() => setIsEditing(false)} />
+        </div>
       )}
-    </>
+    </article>
   );
 }
 
