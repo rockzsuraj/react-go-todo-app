@@ -93,24 +93,39 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 
 	// 🔍 Detect mobile client
 	accept := r.Header.Get("Accept")
-	isMobile := strings.Contains(accept, "application/json")
+	userAgent := r.UserAgent()
+	isMobile := strings.Contains(accept, "application/json") ||
+		strings.Contains(userAgent, "Android") ||
+		strings.Contains(userAgent, "iPhone")
 	slog.Info("callback request", "is_mobile", isMobile)
 
 	stateCookie, err := r.Cookie(oauthStateCookieName)
 	state := r.URL.Query().Get("state")
-	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(state)) != 1 {
-		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state")
-		return
+	if isMobile {
+		// For mobile setups, ensure the state parameter exists at minimum
+		if state == "" {
+			middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Missing OAuth state parameter")
+			return
+		}
+	} else {
+		// Strict cookie validation remains intact for standard Web clients
+		if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(state)) != 1 {
+			middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state cookie")
+			return
+		}
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthStateCookieName,
-		Value:    "",
-		Path:     "/api/auth/callback/google",
-		HttpOnly: true,
-		Secure:   appCfg.Env == "production",
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1,
-	})
+
+	if err == nil {
+		http.SetCookie(w, &http.Cookie{
+			Name:     oauthStateCookieName,
+			Value:    "",
+			Path:     "/api/auth/callback/google",
+			HttpOnly: true,
+			Secure:   appCfg.Env == "production",
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+	}
 
 	oauthCfg := &oauth2.Config{
 		ClientID:     appCfg.GoogleClientID,
@@ -207,13 +222,11 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/* ===================== MOBILE ===================== */
-	if isMobile {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"access_token":  accessToken,
-			"refresh_token": refreshToken,
-		})
+	/* ===================== MOBILE: Redirect back to Android app ===================== */
+	if isMobile || strings.Contains(r.UserAgent(), "Android") || strings.Contains(r.UserAgent(), "iPhone") {
+		// Construct your custom application deep link address
+		mobileRedirectURL := fmt.Sprintf("todoapp://oauth/callback?access_token=%s&refresh_token=%s", accessToken, refreshToken)
+		http.Redirect(w, r, mobileRedirectURL, http.StatusTemporaryRedirect)
 		return
 	}
 

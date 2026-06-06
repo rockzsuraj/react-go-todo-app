@@ -73,7 +73,7 @@ func SetupRouter(authService services.AuthServicer, readinessCheck ReadinessChec
 			r.Get("/callback/google", handlers.GoogleCallback)
 
 			// Refresh is public but has a cooldown (no global rate limit)
-			r.With(appMiddleware.RefreshCooldown(30*time.Second)).
+			r.With(appMiddleware.RefreshCooldown(5*time.Second)).
 				Post("/refresh", handlers.RefreshToken)
 
 			// --- PROTECTED AUTH ---
