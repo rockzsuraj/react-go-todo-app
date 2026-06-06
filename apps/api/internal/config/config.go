@@ -51,7 +51,6 @@ type AppConfig struct {
 	MobileRedirectURI  string
 	JWTSecret          string
 	FrontendURL        string
-	RedisURL           string
 }
 
 // LoadAppConfig loads non-DB related configuration from environment variables.
@@ -71,7 +70,6 @@ func LoadAppConfig() AppConfig {
 		MobileRedirectURI:  GetEnv("MOBILE_REDIRECT_URI", "todoapp://oauth/callback"),
 		JWTSecret:          jwtSecret,
 		FrontendURL:        GetEnv("FRONTEND_URL", "http://localhost:3000"),
-		RedisURL:           os.Getenv("REDIS_URL"),
 	}
 }
 
@@ -87,7 +85,6 @@ func ValidateProductionConfig(cfg AppConfig, dbCfg DBConfig) error {
 		"GOOGLE_REDIRECT_URL":  cfg.GoogleRedirectURL,
 		"JWT_SECRET":           cfg.JWTSecret,
 		"FRONTEND_URL":         cfg.FrontendURL,
-		"REDIS_URL":            cfg.RedisURL,
 	}
 	for name, value := range required {
 		if value == "" {

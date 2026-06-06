@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS token_blacklist (
+    jti TEXT PRIMARY KEY,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS user_blacklist (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -21,7 +21,7 @@ func TestReadinessEndpoint(t *testing.T) {
 	})
 
 	t.Run("dependency unavailable", func(t *testing.T) {
-		router := SetupRouter(nil, func(context.Context) error { return errors.New("redis unavailable") })
+		router := SetupRouter(nil, func(context.Context) error { return errors.New("db unavailable") })
 		rr := httptest.NewRecorder()
 
 		router.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/ready", nil))

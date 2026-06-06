@@ -41,7 +41,7 @@ type blacklistErrorAuthService struct {
 }
 
 func (blacklistErrorAuthService) IsTokenBlacklisted(context.Context, string) (bool, error) {
-	return false, errors.New("redis unavailable")
+	return false, errors.New("blacklist unavailable")
 }
 
 func TestAuthMiddlewareRejectsNonHS256Tokens(t *testing.T) {
@@ -94,7 +94,7 @@ func TestAuthMiddlewareFailsClosedWhenBlacklistCheckFails(t *testing.T) {
 	}
 
 	handler := AuthMiddleware(secret, blacklistErrorAuthService{})(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Fatal("expected request to be rejected when Redis is unavailable")
+		t.Fatal("expected request to be rejected when blacklist check fails")
 	}))
 	req := httptest.NewRequest("GET", "/api/auth/me", nil)
 	req.Header.Set("Authorization", "Bearer "+tokenString)

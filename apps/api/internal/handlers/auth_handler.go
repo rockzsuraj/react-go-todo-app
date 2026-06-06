@@ -14,21 +14,21 @@ import (
 	"react-todos/apps/api/internal/config"
 	"react-todos/apps/api/internal/dto"
 	"react-todos/apps/api/internal/middleware"
+	"react-todos/apps/api/internal/repository"
 	"react-todos/apps/api/internal/services"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
 var authService services.AuthServicer
-var oauthStateStore *redis.Client
+var oauthStateStore *repository.OAuthStateRepository
 
-func InitAuthHandlers(service services.AuthServicer, redisClient *redis.Client) {
+func InitAuthHandlers(service services.AuthServicer, stateRepo *repository.OAuthStateRepository) {
 	authService = service
-	oauthStateStore = redisClient
+	oauthStateStore = stateRepo
 }
 
 /* ===================== UTILS ===================== */
@@ -77,10 +77,12 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
 		return
 	}
-	if err := oauthStateStore.Set(r.Context(), "oauth_state:"+state, "1", 10*time.Minute).Err(); err != nil {
+	if err := oauthStateStore.Store(r.Context(), state, 10*time.Minute); err != nil {
+		slog.Error("failed to store oauth state", "error", err)
 		middleware.SendError(w, err)
 		return
 	}
+	slog.Info("oauth state stored", "state_prefix", state[:8])
 
 	authURL := oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, authURL, http.StatusFound)
@@ -102,12 +104,13 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
 		return
 	}
-	key := "oauth_state:" + state
-	val, err := oauthStateStore.GetDel(r.Context(), key).Result()
-	if err != nil || val != "1" {
+	ok, err := oauthStateStore.Consume(r.Context(), state)
+	if err != nil || !ok {
+		slog.Error("oauth state validation failed", "error", err, "found", ok, "state_prefix", state[:8])
 		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state")
 		return
 	}
+	slog.Info("oauth state validated", "state_prefix", state[:8])
 
 	code := r.URL.Query().Get("code")
 	if code == "" {

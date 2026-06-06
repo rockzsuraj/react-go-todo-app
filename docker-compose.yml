@@ -16,16 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: ./apps/api
@@ -36,15 +26,12 @@ services:
     env_file:
       - .env
     environment:
-      - REDIS_ADDR=redis:6379
       - ENV=${ENV:-development}
     volumes:
       - ./apps/api:/app
       - air_tmp:/app/tmp
     depends_on:
       db:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   frontend:
