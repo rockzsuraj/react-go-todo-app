@@ -91,12 +91,8 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	appCfg := config.LoadAppConfig()
 
-	// 🔍 Detect mobile client
-	accept := r.Header.Get("Accept")
-	userAgent := r.UserAgent()
-	isMobile := strings.Contains(accept, "application/json") ||
-		strings.Contains(userAgent, "Android") ||
-		strings.Contains(userAgent, "iPhone")
+	// 🔍 Detect mobile client via explicit header set by the mobile app
+	isMobile := r.Header.Get("X-Client-Type") == "mobile"
 	slog.Info("callback request", "is_mobile", isMobile)
 
 	stateCookie, err := r.Cookie(oauthStateCookieName)
@@ -223,7 +219,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	/* ===================== MOBILE: Redirect back to Android app ===================== */
-	if isMobile || strings.Contains(r.UserAgent(), "Android") || strings.Contains(r.UserAgent(), "iPhone") {
+	if isMobile {
 		// Construct your custom application deep link address
 		mobileRedirectURL := fmt.Sprintf("todoapp://oauth/callback?access_token=%s&refresh_token=%s", accessToken, refreshToken)
 		http.Redirect(w, r, mobileRedirectURL, http.StatusTemporaryRedirect)
