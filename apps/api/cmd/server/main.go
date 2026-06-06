@@ -99,7 +99,7 @@ func main() {
 
 	// Handlers (INIT ONCE)
 	handlers.InitHandlers(todoService)
-	handlers.InitAuthHandlers(authService)
+	handlers.InitAuthHandlers(authService, redisClient)
 	handlers.InitAdminHandlers(authService)
 
 	// Router

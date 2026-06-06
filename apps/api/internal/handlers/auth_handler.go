@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -19,16 +18,17 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
 var authService services.AuthServicer
+var oauthStateStore *redis.Client
 
-const oauthStateCookieName = "oauth_state"
-
-func InitAuthHandlers(service services.AuthServicer) {
+func InitAuthHandlers(service services.AuthServicer, redisClient *redis.Client) {
 	authService = service
+	oauthStateStore = redisClient
 }
 
 /* ===================== UTILS ===================== */
@@ -71,15 +71,16 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthStateCookieName,
-		Value:    state,
-		Path:     "/api/auth/callback/google",
-		HttpOnly: true,
-		Secure:   appCfg.Env == "production",
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   10 * 60,
-	})
+	// Store state in Redis instead of a cookie — cookies are unreliable across
+	// different domains (frontend vs backend on separate Render services).
+	if oauthStateStore == nil {
+		middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
+		return
+	}
+	if err := oauthStateStore.Set(r.Context(), "oauth_state:"+state, "1", 10*time.Minute).Err(); err != nil {
+		middleware.SendError(w, err)
+		return
+	}
 
 	authURL := oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, authURL, http.StatusFound)
@@ -90,22 +91,23 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	appCfg := config.LoadAppConfig()
 
-	stateCookie, err := r.Cookie(oauthStateCookieName)
 	state := r.URL.Query().Get("state")
-	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(state)) != 1 {
-		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state")
+	if state == "" {
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Missing OAuth state")
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthStateCookieName,
-		Value:    "",
-		Path:     "/api/auth/callback/google",
-		HttpOnly: true,
-		Secure:   appCfg.Env == "production",
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1,
-	})
+	// Validate state from Redis — consume it immediately (one-time use)
+	if oauthStateStore == nil {
+		middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
+		return
+	}
+	key := "oauth_state:" + state
+	val, err := oauthStateStore.GetDel(r.Context(), key).Result()
+	if err != nil || val != "1" {
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state")
+		return
+	}
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -113,7 +115,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, refreshToken, user, err := exchangeGoogleCode(r.Context(), appCfg, code, appCfg.GoogleRedirectURL)
+	accessToken, refreshToken, err := exchangeGoogleCode(r.Context(), appCfg, code, appCfg.GoogleRedirectURL)
 	if err != nil {
 		middleware.SendError(w, err)
 		return
@@ -127,7 +129,7 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   7 * 24 * 60 * 60,
+		MaxAge:   15 * 60,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -138,7 +140,6 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   30 * 24 * 60 * 60,
 	})
-	_ = user
 
 	http.Redirect(w, r, appCfg.FrontendURL+"/oauth/callback", http.StatusTemporaryRedirect)
 }
@@ -170,13 +171,12 @@ func MobileGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		redirectURI = appCfg.MobileRedirectURI // e.g. "todoapp://oauth/callback"
 	}
 
-	accessToken, refreshToken, user, err := exchangeGoogleCode(r.Context(), appCfg, req.Code, redirectURI, oauth2.SetAuthURLParam("code_verifier", req.CodeVerifier))
+	accessToken, refreshToken, err := exchangeGoogleCode(r.Context(), appCfg, req.Code, redirectURI, oauth2.SetAuthURLParam("code_verifier", req.CodeVerifier))
 	if err != nil {
 		slog.Error("mobile google auth failed", "error", err)
 		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_OAUTH_EXCHANGE", "OAuth code exchange failed")
 		return
 	}
-	_ = user
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -188,7 +188,7 @@ func MobileGoogleAuth(w http.ResponseWriter, r *http.Request) {
 
 /* ===================== SHARED: code exchange + token issuance ===================== */
 
-func exchangeGoogleCode(ctx context.Context, appCfg config.AppConfig, code, redirectURI string, opts ...oauth2.AuthCodeOption) (accessToken, refreshToken string, user interface{}, err error) {
+func exchangeGoogleCode(ctx context.Context, appCfg config.AppConfig, code, redirectURI string, opts ...oauth2.AuthCodeOption) (accessToken, refreshToken string, err error) {
 	oauthCfg := &oauth2.Config{
 		ClientID:     appCfg.GoogleClientID,
 		ClientSecret: appCfg.GoogleClientSecret,
@@ -202,12 +202,12 @@ func exchangeGoogleCode(ctx context.Context, appCfg config.AppConfig, code, redi
 
 	tok, err := oauthCfg.Exchange(ctx, code, opts...)
 	if err != nil {
-		return "", "", nil, err
+		return "", "", err
 	}
 
 	resp, err := oauthCfg.Client(ctx, tok).Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
-		return "", "", nil, err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 
@@ -218,12 +218,12 @@ func exchangeGoogleCode(ctx context.Context, appCfg config.AppConfig, code, redi
 		Picture string `json:"picture"`
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&g); err != nil {
-		return "", "", nil, err
+		return "", "", err
 	}
 
 	u, err := authService.HandleGoogleLogin(ctx, g.ID, g.Email, g.Name, g.Picture)
 	if err != nil {
-		return "", "", nil, err
+		return "", "", err
 	}
 
 	jti := uuid.NewString()
@@ -231,25 +231,26 @@ func exchangeGoogleCode(ctx context.Context, appCfg config.AppConfig, code, redi
 		"sub":  u.ID,
 		"jti":  jti,
 		"role": u.Role,
-		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
+		"iat":  time.Now().Unix(),
+		"exp":  time.Now().Add(15 * time.Minute).Unix(), // short-lived: refresh token handles renewal
 	}
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	accessToken, err = jwtToken.SignedString([]byte(appCfg.JWTSecret))
 	if err != nil {
-		return "", "", nil, err
+		return "", "", err
 	}
 
 	refreshToken, err = generateRefreshToken()
 	if err != nil {
-		return "", "", nil, err
+		return "", "", err
 	}
 
 	err = authService.StoreRefreshToken(ctx, uuid.NewString(), u.ID, refreshToken, time.Now().Add(30*24*time.Hour))
 	if err != nil {
-		return "", "", nil, err
+		return "", "", err
 	}
 
-	return accessToken, refreshToken, u, nil
+	return accessToken, refreshToken, nil
 }
 
 /* ===================== AUTH ME ===================== */
@@ -419,7 +420,8 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		"sub":  userID,
 		"jti":  jti,
 		"role": user.Role,
-		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
+		"iat":  time.Now().Unix(),
+		"exp":  time.Now().Add(15 * time.Minute).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -455,16 +457,13 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("Set new refresh token cookie")
 	}
 
-	// 📱 Mobile response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-
-	response := dto.SuccessResponse(map[string]string{"access_token": accessToken})
+	respData := map[string]string{"access_token": accessToken}
 	if newRefreshToken != "" {
-		response.Data.(map[string]string)["refresh_token"] = newRefreshToken
+		respData["refresh_token"] = newRefreshToken
 	}
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(dto.SuccessResponse(respData)); err != nil {
 		slog.Error("Failed to encode refresh response", "error", err)
 	}
 
