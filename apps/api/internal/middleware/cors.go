@@ -11,8 +11,7 @@ func CORS() func(http.Handler) http.Handler {
 		// Restrict to explicit origins when sending credentials.
 		AllowedOrigins: []string{
 			"http://localhost:3000",
-			"https://react-springboot-full-stack.onrender.com",
-			// Add your production domains here
+			"https://react-todos.onrender.com",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-API-Key", "Cookie"},

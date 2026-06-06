@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -86,149 +85,41 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
-/* ===================== GOOGLE CALLBACK ===================== */
+/* ===================== GOOGLE CALLBACK (Web only) ===================== */
 
 func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	appCfg := config.LoadAppConfig()
 
-	// 🔍 Detect mobile client via explicit header set by the mobile app
-	isMobile := r.Header.Get("X-Client-Type") == "mobile"
-	slog.Info("callback request", "is_mobile", isMobile)
-
 	stateCookie, err := r.Cookie(oauthStateCookieName)
 	state := r.URL.Query().Get("state")
-	if isMobile {
-		// For mobile setups, ensure the state parameter exists at minimum
-		if state == "" {
-			middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Missing OAuth state parameter")
-			return
-		}
-	} else {
-		// Strict cookie validation remains intact for standard Web clients
-		if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(state)) != 1 {
-			middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state cookie")
-			return
-		}
+	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(state)) != 1 {
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state")
+		return
 	}
 
-	if err == nil {
-		http.SetCookie(w, &http.Cookie{
-			Name:     oauthStateCookieName,
-			Value:    "",
-			Path:     "/api/auth/callback/google",
-			HttpOnly: true,
-			Secure:   appCfg.Env == "production",
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1,
-		})
-	}
-
-	oauthCfg := &oauth2.Config{
-		ClientID:     appCfg.GoogleClientID,
-		ClientSecret: appCfg.GoogleClientSecret,
-		RedirectURL:  appCfg.GoogleRedirectURL,
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/userinfo.profile",
-		},
-		Endpoint: google.Endpoint,
-	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    "",
+		Path:     "/api/auth/callback/google",
+		HttpOnly: true,
+		Secure:   appCfg.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_MISSING_CODE", "Missing authorization code")
 		return
 	}
 
-	tok, err := oauthCfg.Exchange(context.Background(), code)
+	accessToken, refreshToken, user, err := exchangeGoogleCode(r.Context(), appCfg, code, appCfg.GoogleRedirectURL)
 	if err != nil {
 		middleware.SendError(w, err)
 		return
 	}
 
-	client := oauthCfg.Client(context.Background(), tok)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
-	if err != nil {
-		middleware.SendError(w, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	var g struct {
-		ID      string `json:"id"`
-		Email   string `json:"email"`
-		Name    string `json:"name"`
-		Picture string `json:"picture"`
-	}
-
-	if err := json.Unmarshal(body, &g); err != nil {
-		middleware.SendError(w, err)
-		return
-	}
-
-	// 🔥 Persist user
-	user, err := authService.HandleGoogleLogin(
-		r.Context(),
-		g.ID,
-		g.Email,
-		g.Name,
-		g.Picture,
-	)
-	if err != nil {
-		middleware.SendError(w, err)
-		return
-	}
-
-	// 🔐 Access token (7 days)
-	jti := uuid.NewString()
-	claims := jwt.MapClaims{
-		"sub":  user.ID,
-		"jti":  jti,
-		"role": user.Role,
-		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
-	}
-
-	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	accessToken, err := jwtToken.SignedString([]byte(appCfg.JWTSecret))
-	if err != nil {
-		middleware.SendError(w, err)
-		return
-	}
-
-	// 🔁 Refresh token (30 days)
-	refreshToken, err := generateRefreshToken()
-	if err != nil {
-		middleware.SendError(w, err)
-		return
-	}
-
-	refreshID := uuid.NewString()
-
-	err = authService.StoreRefreshToken(
-		r.Context(),
-		refreshID,
-		user.ID,
-		refreshToken,
-		time.Now().Add(30*24*time.Hour),
-	)
-	if err != nil {
-		middleware.SendError(w, err)
-		return
-	}
-
-	/* ===================== MOBILE: Redirect back to Android app ===================== */
-	if isMobile {
-		// Construct your custom application deep link address
-		mobileRedirectURL := fmt.Sprintf("todoapp://oauth/callback?access_token=%s&refresh_token=%s", accessToken, refreshToken)
-		http.Redirect(w, r, mobileRedirectURL, http.StatusTemporaryRedirect)
-		return
-	}
-
-	/* ===================== WEB: set cookies on redirect, no tokens in URL ===================== */
 	secure := appCfg.Env == "production"
-
 	http.SetCookie(w, &http.Cookie{
 		Name:     "token",
 		Value:    accessToken,
@@ -247,9 +138,118 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   30 * 24 * 60 * 60,
 	})
+	_ = user
 
-	redirectURL := appCfg.FrontendURL + "/oauth/callback"
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, appCfg.FrontendURL+"/oauth/callback", http.StatusTemporaryRedirect)
+}
+
+/* ===================== MOBILE GOOGLE AUTH (Android/iOS) ===================== */
+
+// MobileGoogleAuth receives the authorization code from the Android app after
+// the user completes the Google consent in a Chrome Custom Tab. The app captures
+// the deep-link redirect (todoapp://oauth/callback?code=X), then POSTs the code
+// here along with the PKCE code_verifier. Tokens are returned in the JSON body —
+// never in a URL.
+func MobileGoogleAuth(w http.ResponseWriter, r *http.Request) {
+	appCfg := config.LoadAppConfig()
+
+	var req struct {
+		Code         string `json:"code"`
+		CodeVerifier string `json:"code_verifier"`
+		RedirectURI  string `json:"redirect_uri"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" {
+		middleware.SendJSONErrorWithCode(w, http.StatusBadRequest, "ERR_INVALID_REQUEST", "code is required")
+		return
+	}
+
+	// The Android client uses the custom-scheme URI registered in its manifest.
+	// It must match exactly what was used when requesting the auth code.
+	redirectURI := req.RedirectURI
+	if redirectURI == "" {
+		redirectURI = appCfg.MobileRedirectURI // e.g. "todoapp://oauth/callback"
+	}
+
+	accessToken, refreshToken, user, err := exchangeGoogleCode(r.Context(), appCfg, req.Code, redirectURI, oauth2.SetAuthURLParam("code_verifier", req.CodeVerifier))
+	if err != nil {
+		slog.Error("mobile google auth failed", "error", err)
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_OAUTH_EXCHANGE", "OAuth code exchange failed")
+		return
+	}
+	_ = user
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(dto.SuccessResponse(map[string]string{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	}))
+}
+
+/* ===================== SHARED: code exchange + token issuance ===================== */
+
+func exchangeGoogleCode(ctx context.Context, appCfg config.AppConfig, code, redirectURI string, opts ...oauth2.AuthCodeOption) (accessToken, refreshToken string, user interface{}, err error) {
+	oauthCfg := &oauth2.Config{
+		ClientID:     appCfg.GoogleClientID,
+		ClientSecret: appCfg.GoogleClientSecret,
+		RedirectURL:  redirectURI,
+		Scopes: []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+		},
+		Endpoint: google.Endpoint,
+	}
+
+	tok, err := oauthCfg.Exchange(ctx, code, opts...)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	resp, err := oauthCfg.Client(ctx, tok).Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		return "", "", nil, err
+	}
+	defer resp.Body.Close()
+
+	var g struct {
+		ID      string `json:"id"`
+		Email   string `json:"email"`
+		Name    string `json:"name"`
+		Picture string `json:"picture"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&g); err != nil {
+		return "", "", nil, err
+	}
+
+	u, err := authService.HandleGoogleLogin(ctx, g.ID, g.Email, g.Name, g.Picture)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	jti := uuid.NewString()
+	claims := jwt.MapClaims{
+		"sub":  u.ID,
+		"jti":  jti,
+		"role": u.Role,
+		"exp":  time.Now().Add(7 * 24 * time.Hour).Unix(),
+	}
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	accessToken, err = jwtToken.SignedString([]byte(appCfg.JWTSecret))
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	refreshToken, err = generateRefreshToken()
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	err = authService.StoreRefreshToken(ctx, uuid.NewString(), u.ID, refreshToken, time.Now().Add(30*24*time.Hour))
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	return accessToken, refreshToken, u, nil
 }
 
 /* ===================== AUTH ME ===================== */

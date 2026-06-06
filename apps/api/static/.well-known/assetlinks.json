@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.build.todoapplearn",
+      "sha256_cert_fingerprints": [
+        "43:CE:A4:62:55:CF:89:FD:C6:E3:3F:BA:07:C8:70:4A:ED:7D:80:3E:47:2A:0A:57:F7:CD:4E:2D:93:84:4E:30"
+      ]
+    }
+  }
+]

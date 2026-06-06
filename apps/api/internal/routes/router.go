@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	_ "embed"
 	"log/slog"
 	"net/http"
 	"time"
@@ -15,6 +16,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
+
+//go:embed static/.well-known/assetlinks.json
+var assetLinksJSON []byte
 
 type ReadinessCheck func(context.Context) error
 
@@ -55,6 +59,16 @@ func SetupRouter(authService services.AuthServicer, readinessCheck ReadinessChec
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
 	})
 
+	// ===== ANDROID APP LINKS (Digital Asset Links) =====
+	// Must be served at /.well-known/assetlinks.json with Content-Type application/json.
+	// Android verifies this at install time to enable App Links (no disambiguation dialog).
+	r.Get("/.well-known/assetlinks.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.WriteHeader(http.StatusOK)
+		w.Write(assetLinksJSON)
+	})
+
 	// ===== ROOT ROUTE =====
 	r.Get("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -71,6 +85,8 @@ func SetupRouter(authService services.AuthServicer, readinessCheck ReadinessChec
 			r.With(authLimiter.RateLimit(10, time.Minute)).
 				Get("/google/login", handlers.GoogleLogin)
 			r.Get("/callback/google", handlers.GoogleCallback)
+			r.With(authLimiter.RateLimit(10, time.Minute)).
+				Post("/mobile/google", handlers.MobileGoogleAuth)
 
 			// Refresh is public but has a cooldown (no global rate limit)
 			r.With(appMiddleware.RefreshCooldown(5*time.Second)).

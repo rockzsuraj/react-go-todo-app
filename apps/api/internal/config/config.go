@@ -48,6 +48,7 @@ type AppConfig struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
+	MobileRedirectURI  string
 	JWTSecret          string
 	FrontendURL        string
 	RedisURL           string
@@ -67,6 +68,7 @@ func LoadAppConfig() AppConfig {
 		GoogleClientID:     GetEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: GetEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", "http://localhost:8080/api/auth/callback/google"),
+		MobileRedirectURI:  GetEnv("MOBILE_REDIRECT_URI", "todoapp://oauth/callback"),
 		JWTSecret:          jwtSecret,
 		FrontendURL:        GetEnv("FRONTEND_URL", "http://localhost:3000"),
 		RedisURL:           os.Getenv("REDIS_URL"),
