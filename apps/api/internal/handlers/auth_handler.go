@@ -71,46 +71,50 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store state in Redis instead of a cookie — cookies are unreliable across
-	// different domains (frontend vs backend on separate Render services).
-	if oauthStateStore == nil {
-		middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
-		return
-	}
-	if err := oauthStateStore.Store(r.Context(), state, 10*time.Minute); err != nil {
-		slog.Error("failed to store oauth state", "error", err)
-		middleware.SendError(w, err)
-		return
-	}
-	slog.Info("oauth state stored", "state_prefix", state[:8])
+	var authURL string
 
-	authURL := oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	// Mobile PKCE flow: if code_challenge is present, it's an Android app request.
+	// We pass the challenge through to Google and skip the server-side state store
+	// (state validation is replaced by the PKCE verifier check on token exchange).
+	codeChallenge := r.URL.Query().Get("code_challenge")
+	mobileRedirectURI := r.URL.Query().Get("redirect_uri")
+	if codeChallenge != "" {
+		challengeMethod := r.URL.Query().Get("code_challenge_method")
+		if challengeMethod == "" {
+			challengeMethod = "S256"
+		}
+		// For mobile, use the app's custom-scheme redirect URI so Google bounces back through our callback
+		if mobileRedirectURI != "" {
+			oauthCfg.RedirectURL = appCfg.GoogleRedirectURL // backend callback handles the relay
+		}
+		authURL = oauthCfg.AuthCodeURL(
+			state,
+			oauth2.AccessTypeOffline,
+			oauth2.SetAuthURLParam("code_challenge", codeChallenge),
+			oauth2.SetAuthURLParam("code_challenge_method", challengeMethod),
+		)
+	} else {
+		// Web flow: store state for CSRF protection
+		if oauthStateStore == nil {
+			middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
+			return
+		}
+		if err := oauthStateStore.Store(r.Context(), state, 10*time.Minute); err != nil {
+			slog.Error("failed to store oauth state", "error", err)
+			middleware.SendError(w, err)
+			return
+		}
+		slog.Info("oauth state stored", "state_prefix", state[:8])
+		authURL = oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	}
+
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
-/* ===================== GOOGLE CALLBACK (Web only) ===================== */
+/* ===================== GOOGLE CALLBACK (Web + Mobile) ===================== */
 
 func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	appCfg := config.LoadAppConfig()
-
-	state := r.URL.Query().Get("state")
-	if state == "" {
-		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Missing OAuth state")
-		return
-	}
-
-	// Validate state from Redis — consume it immediately (one-time use)
-	if oauthStateStore == nil {
-		middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
-		return
-	}
-	ok, err := oauthStateStore.Consume(r.Context(), state)
-	if err != nil || !ok {
-		slog.Error("oauth state validation failed", "error", err, "found", ok, "state_prefix", state[:8])
-		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_INVALID_OAUTH_STATE", "Invalid OAuth state")
-		return
-	}
-	slog.Info("oauth state validated", "state_prefix", state[:8])
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -118,19 +122,54 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, refreshToken, err := exchangeGoogleCode(r.Context(), appCfg, code, appCfg.GoogleRedirectURL)
-	if err != nil {
-		middleware.SendError(w, err)
+	state := r.URL.Query().Get("state")
+
+	// Mobile PKCE flow: the app launched a browser pointing at /api/auth/google/login
+	// with a code_challenge. Google redirects here. If the state is absent or not
+	// found in our store, it came from the mobile path (no server-side state stored).
+	isMobile := false
+	if state == "" {
+		isMobile = true
+	} else {
+		if oauthStateStore == nil {
+			middleware.SendJSONErrorWithCode(w, http.StatusServiceUnavailable, "ERR_SERVICE_UNAVAILABLE", "Auth service unavailable")
+			return
+		}
+		ok, err := oauthStateStore.Consume(r.Context(), state)
+		if err != nil || !ok {
+			// State not found — treat as mobile PKCE callback
+			prefix := state
+			if len(prefix) > 8 {
+				prefix = prefix[:8]
+			}
+			slog.Warn("state not found in store, treating as mobile", "state_prefix", prefix)
+			isMobile = true
+		} else {
+			slog.Info("oauth state validated", "state_prefix", state[:8])
+		}
+	}
+
+	if isMobile {
+		// PKCE browser flow: redirect back to the app with the code via custom scheme.
+		// The app captures this deep link and POSTs code + code_verifier to
+		// /api/auth/mobile/google for the actual token exchange.
+		deepLink := fmt.Sprintf("%s?code=%s", appCfg.MobileRedirectURI, code)
+		http.Redirect(w, r, deepLink, http.StatusTemporaryRedirect)
 		return
 	}
 
-	secure := appCfg.Env == "production"
+	accessToken, refreshToken, err := exchangeGoogleCode(r.Context(), appCfg, code, appCfg.GoogleRedirectURL)
+	if err != nil {
+		slog.Error("google code exchange failed", "error", err)
+		middleware.SendJSONErrorWithCode(w, http.StatusUnauthorized, "ERR_OAUTH_EXCHANGE", "OAuth code exchange failed")
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "token",
 		Value:    accessToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   appCfg.Env == "production",
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   15 * 60,
 	})
@@ -139,11 +178,10 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		Value:    refreshToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   appCfg.Env == "production",
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   30 * 24 * 60 * 60,
 	})
-
 	http.Redirect(w, r, appCfg.FrontendURL+"/oauth/callback", http.StatusTemporaryRedirect)
 }
 

@@ -1,0 +1,4 @@
+toml
+[versions]
+[libraries]
+google-errorprone-annotations = { group = "com.google.errorprone", name = "error_prone_annotations", version.ref = "errorprone" }

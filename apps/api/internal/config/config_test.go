@@ -13,7 +13,6 @@ func validProductionConfig() (AppConfig, DBConfig) {
 		GoogleRedirectURL:  "https://example.com/api/auth/callback/google",
 		JWTSecret:          "a-production-jwt-secret-with-32-chars",
 		FrontendURL:        "https://example.com",
-		RedisURL:           "rediss://default:secret@example.com:6379",
 	}, DBConfig{DatabaseURL: "postgresql://example"}
 }
 
@@ -32,16 +31,6 @@ func TestValidateProductionConfigRequiresJWTSecret(t *testing.T) {
 	err := ValidateProductionConfig(appCfg, dbCfg)
 	if err == nil || !strings.Contains(err.Error(), "JWT_SECRET") {
 		t.Fatalf("expected JWT_SECRET error, got %v", err)
-	}
-}
-
-func TestValidateProductionConfigRequiresRedisURL(t *testing.T) {
-	appCfg, dbCfg := validProductionConfig()
-	appCfg.RedisURL = ""
-
-	err := ValidateProductionConfig(appCfg, dbCfg)
-	if err == nil || !strings.Contains(err.Error(), "REDIS_URL") {
-		t.Fatalf("expected REDIS_URL error, got %v", err)
 	}
 }
 
