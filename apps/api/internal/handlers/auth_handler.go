@@ -198,19 +198,17 @@ func MobileGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code         string `json:"code"`
 		CodeVerifier string `json:"code_verifier"`
-		RedirectURI  string `json:"redirect_uri"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" {
 		middleware.SendJSONErrorWithCode(w, http.StatusBadRequest, "ERR_INVALID_REQUEST", "code is required")
 		return
 	}
 
-	// The Android client uses the custom-scheme URI registered in its manifest.
-	// It must match exactly what was used when requesting the auth code.
-	redirectURI := req.RedirectURI
-	if redirectURI == "" {
-		redirectURI = appCfg.MobileRedirectURI // e.g. "todoapp://oauth/callback"
-	}
+	// The redirect_uri used here must exactly match what was used in the
+	// authorization request — which is always the backend's Google callback URL.
+	// The app's custom scheme (todoapp://) is only used by GoogleCallback to
+	// relay the code back to the app, never sent to Google directly.
+	redirectURI := appCfg.GoogleRedirectURL
 
 	accessToken, refreshToken, err := exchangeGoogleCode(r.Context(), appCfg, req.Code, redirectURI, oauth2.SetAuthURLParam("code_verifier", req.CodeVerifier))
 	if err != nil {
