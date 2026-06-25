@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   # ── Go API ──────────────────────────────────────────────────────────────────
   api:
@@ -24,6 +27,12 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      - name: Format check
+        run: test -z "$(gofmt -l .)"
+
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Test
         run: go test -race -count=1 ./...
@@ -52,6 +61,12 @@ jobs:
 
       - name: Biome check
         run: npm run check
+
+      - name: Test
+        run: npm test -- --watchAll=false --watchman=false
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
 
       - name: Production build
         run: npm run build
@@ -94,3 +109,14 @@ jobs:
             REACT_APP_FRONTEND_URL=https://placeholder.onrender.com
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Validate nginx template
+        run: |
+          docker run --rm \
+            -e API_BACKEND_URL=https://placeholder.onrender.com \
+            $(docker build -q \
+              --target production \
+              --build-arg REACT_APP_API_URL=https://placeholder.onrender.com \
+              --build-arg REACT_APP_FRONTEND_URL=https://placeholder.onrender.com \
+              -f apps/web/frontend.Dockerfile apps/web) \
+            nginx -t

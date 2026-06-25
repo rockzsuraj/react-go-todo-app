@@ -39,6 +39,7 @@ services:
       - .env
     environment:
       - ENV=${ENV:-development}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
     volumes:
       - ./apps/api:/app
       - air_tmp:/app/tmp

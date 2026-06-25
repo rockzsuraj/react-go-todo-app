@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from './useAuth';
+import { useEffect } from 'react';
 import { logger } from '../services/logger';
+import { useAuth } from './useAuth';
 
 export const useTodoSSE = () => {
   const queryClient = useQueryClient();

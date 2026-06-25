@@ -1,19 +1,27 @@
 name: Deploy to Render
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches: [main]
+    types: [completed]
+  workflow_dispatch:
 
 # Only one deploy at a time; cancel in-flight runs if a new commit lands.
 concurrency:
   group: deploy-production
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Trigger Render deploy
     runs-on: ubuntu-latest
     environment: production   # requires manual approval in GitHub Environments (optional)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 20
 
     steps:
       - name: Deploy API service
@@ -45,8 +53,24 @@ jobs:
               echo "API is ready (attempt $i)"
               exit 0
             fi
-            echo "Attempt $i: status=$STATUS — retrying in 10s"
+            echo "Attempt $i: status=$STATUS; retrying in 10s"
             sleep 10
           done
           echo "API did not become ready in time"
+          exit 1
+
+      - name: Wait for Web to go live
+        run: |
+          echo "Waiting for Web readiness..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+              "${{ secrets.RENDER_WEB_URL }}/health" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Web is ready (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i: status=$STATUS; retrying in 10s"
+            sleep 10
+          done
+          echo "Web did not become ready in time"
           exit 1

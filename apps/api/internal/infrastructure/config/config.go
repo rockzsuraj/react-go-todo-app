@@ -50,7 +50,7 @@ type AppConfig struct {
 	GoogleRedirectURL  string
 	JWTSecret          string
 	FrontendURL        string
-	RedisAddr          string
+	RedisURL           string
 }
 
 // LoadAppConfig loads non-DB related configuration from environment variables.
@@ -69,7 +69,7 @@ func LoadAppConfig() AppConfig {
 		GoogleRedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", "http://localhost:8080/api/auth/callback/google"),
 		JWTSecret:          jwtSecret,
 		FrontendURL:        GetEnv("FRONTEND_URL", "http://localhost:3000"),
-		RedisAddr:          GetEnv("REDIS_ADDR", "localhost:6379"),
+		RedisURL:           GetEnv("REDIS_URL", GetEnv("REDIS_ADDR", "")),
 	}
 }
 

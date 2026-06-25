@@ -59,3 +59,22 @@ func TestValidateProductionConfigAllowsDevelopmentDefaults(t *testing.T) {
 		t.Fatalf("expected development config to pass, got %v", err)
 	}
 }
+
+func TestLoadAppConfigPrefersRedisURL(t *testing.T) {
+	t.Setenv("REDIS_URL", "redis://render-redis:6379")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
+
+	cfg := LoadAppConfig()
+	if cfg.RedisURL != "redis://render-redis:6379" {
+		t.Fatalf("expected REDIS_URL to win, got %q", cfg.RedisURL)
+	}
+}
+
+func TestLoadAppConfigFallsBackToRedisAddr(t *testing.T) {
+	t.Setenv("REDIS_ADDR", "localhost:6379")
+
+	cfg := LoadAppConfig()
+	if cfg.RedisURL != "localhost:6379" {
+		t.Fatalf("expected REDIS_ADDR fallback, got %q", cfg.RedisURL)
+	}
+}

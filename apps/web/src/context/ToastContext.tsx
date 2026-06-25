@@ -1,4 +1,11 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import type React from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from 'react';
 
 export type ToastVariant = 'success' | 'error' | 'info';
 

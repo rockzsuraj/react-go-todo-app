@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import './Skeleton.css';
 
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {

@@ -37,8 +37,8 @@ export function useAuth() {
       }
     },
     retry: false,
-    staleTime: 30_000,           // re-use cached user for 30 s
-    gcTime: 5 * 60_000,          // keep in cache for 5 min after unmount
+    staleTime: 30_000, // re-use cached user for 30 s
+    gcTime: 5 * 60_000, // keep in cache for 5 min after unmount
     refetchOnWindowFocus: false, // disable aggressive refetching on window focus to prevent rate-limiting
     refetchOnReconnect: true,
   });
@@ -55,7 +55,10 @@ export function useLogout() {
       window.location.href = '/login';
     },
     onError: (error) => {
-      logger.error('[useAuth] Logout API call failed (redirecting anyway):', error);
+      logger.error(
+        '[useAuth] Logout API call failed (redirecting anyway):',
+        error,
+      );
     },
   });
 }

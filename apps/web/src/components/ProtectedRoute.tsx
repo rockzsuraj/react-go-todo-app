@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import LoadingSkeleton from './LoadingSkeleton';
 import { useAuth } from '../hooks/useAuth';
+import LoadingSkeleton from './LoadingSkeleton';
 
 /**
  * Renders child routes only when the user is authenticated.

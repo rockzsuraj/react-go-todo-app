@@ -1,7 +1,8 @@
 import React, { useId } from 'react';
 import './TextArea.css';
 
-export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface TextAreaProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
 }
@@ -13,7 +14,9 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
     const errorId = `${inputId}-error`;
 
     return (
-      <div className={`ui-textarea-wrapper ${error ? 'ui-textarea-wrapper--error' : ''}`}>
+      <div
+        className={`ui-textarea-wrapper ${error ? 'ui-textarea-wrapper--error' : ''}`}
+      >
         {label && (
           <label htmlFor={inputId} className="ui-textarea-label">
             {label}
@@ -35,7 +38,7 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 TextArea.displayName = 'TextArea';

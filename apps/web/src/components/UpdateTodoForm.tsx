@@ -76,4 +76,3 @@ function UpdateTodoForm({ todo, onCancel }: Props) {
 }
 
 export default UpdateTodoForm;
-

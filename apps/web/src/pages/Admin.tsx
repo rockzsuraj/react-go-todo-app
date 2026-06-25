@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 import { useRevokeUser, useUnblockUser } from '../hooks/useAdmin';
 import { useAuth } from '../hooks/useAuth';
-import { useToast } from '../context/ToastContext';
 import { APIErrorHandler } from '../utils/errorHandler';
 
 export default function Admin() {

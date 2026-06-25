@@ -1,7 +1,8 @@
 import React from 'react';
 import './Button.css';
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
@@ -23,7 +24,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       type = 'button',
       ...props
     },
-    ref
+    ref,
   ) => {
     return (
       <button
@@ -39,12 +40,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             <span className="ui-btn__spinner-inner" />
           </span>
         )}
-        {!isLoading && leftIcon && <span className="ui-btn__icon ui-btn__icon--left">{leftIcon}</span>}
+        {!isLoading && leftIcon && (
+          <span className="ui-btn__icon ui-btn__icon--left">{leftIcon}</span>
+        )}
         <span className="ui-btn__text">{children}</span>
-        {!isLoading && rightIcon && <span className="ui-btn__icon ui-btn__icon--right">{rightIcon}</span>}
+        {!isLoading && rightIcon && (
+          <span className="ui-btn__icon ui-btn__icon--right">{rightIcon}</span>
+        )}
       </button>
     );
-  }
+  },
 );
 
 Button.displayName = 'Button';

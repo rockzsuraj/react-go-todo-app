@@ -1,8 +1,8 @@
 import { Navigate, useSearchParams } from 'react-router-dom';
 import LoginCard from '../components/LoginCard';
+import { Spinner } from '../components/ui';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { Spinner } from '../components/ui';
 
 export default function Login() {
   usePageTitle('Login');
@@ -33,4 +33,3 @@ export default function Login() {
 
   return <LoginCard errorCode={errorCode} errorMessage={errorMessage} />;
 }
-

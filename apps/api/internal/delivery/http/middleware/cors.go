@@ -9,9 +9,11 @@ import (
 // CORS returns a middleware that restricts cross-origin requests to the
 // explicitly allowed origins. Pass the runtime frontend URL (from AppConfig)
 // so the list is never hard-coded and works across environments.
-func CORS(allowedOrigins ...string) func(http.Handler) http.Handler {
-	// Always allow localhost for local development.
-	origins := []string{"http://localhost:3000"}
+func CORS(env string, allowedOrigins ...string) func(http.Handler) http.Handler {
+	origins := make([]string, 0, len(allowedOrigins)+1)
+	if env != "production" {
+		origins = append(origins, "http://localhost:3000")
+	}
 	for _, o := range allowedOrigins {
 		if o != "" {
 			origins = append(origins, o)

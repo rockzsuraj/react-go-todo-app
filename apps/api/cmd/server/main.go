@@ -51,9 +51,9 @@ func main() {
 
 	// Initialize Redis with connection pool
 	var redisClient *redis.Client
-	if appCfg.RedisAddr != "" {
+	if appCfg.RedisURL != "" {
 		var err error
-		redisClient, err = db.NewRedisClient(appCfg.RedisAddr)
+		redisClient, err = db.NewRedisClient(appCfg.RedisURL)
 		if err != nil {
 			logger.Warn("running without Redis cache, falling back to local/in-memory", "error", err)
 		} else {

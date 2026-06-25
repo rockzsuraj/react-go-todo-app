@@ -81,7 +81,9 @@ describe('useAuth Hook', () => {
     });
 
     it('should return null on network error without redirecting', async () => {
-      (authApi.getMe as jest.Mock).mockRejectedValue(new Error('Network Error'));
+      (authApi.getMe as jest.Mock).mockRejectedValue(
+        new Error('Network Error'),
+      );
 
       const { result } = renderHook(() => useAuth(), { wrapper });
 

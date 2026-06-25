@@ -1,7 +1,7 @@
-import React from 'react';
+import type React from 'react';
 import './Spinner.css';
 
-export interface SpinnerProps extends React.HTMLAttributes<HTMLSpanElement> {
+export interface SpinnerProps extends React.HTMLAttributes<HTMLOutputElement> {
   size?: 'sm' | 'md' | 'lg';
   variant?: 'primary' | 'neutral' | 'white';
 }
@@ -13,12 +13,11 @@ export const Spinner: React.FC<SpinnerProps> = ({
   ...props
 }) => {
   return (
-    <span
+    <output
       className={`ui-spinner ui-spinner--${size} ui-spinner--${variant} ${className}`}
-      role="status"
       {...props}
     >
       <span className="visually-hidden">Loading...</span>
-    </span>
+    </output>
   );
 };

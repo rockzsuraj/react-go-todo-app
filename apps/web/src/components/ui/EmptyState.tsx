@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import './EmptyState.css';
 
 export interface EmptyStateProps {
@@ -15,13 +15,13 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   action,
 }) => {
   return (
-    <div className="ui-empty-state" role="region" aria-label="No content available">
+    <section className="ui-empty-state" aria-label="No content available">
       <div className="ui-empty-state__icon-wrapper">
         <i className={`bi ${icon} ui-empty-state__icon`} aria-hidden="true" />
       </div>
       <h3 className="ui-empty-state__title">{title}</h3>
       <p className="ui-empty-state__description">{description}</p>
       {action && <div className="ui-empty-state__action">{action}</div>}
-    </div>
+    </section>
   );
 };

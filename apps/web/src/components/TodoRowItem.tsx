@@ -67,7 +67,9 @@ function TodoRowItem({
           size="sm"
           disabled={isDeleting}
           onClick={() => setIsEditing((v) => !v)}
-          leftIcon={<i className={`bi ${isEditing ? 'bi-x-lg' : 'bi-pencil'}`} />}
+          leftIcon={
+            <i className={`bi ${isEditing ? 'bi-x-lg' : 'bi-pencil'}`} />
+          }
           aria-label={isEditing ? 'Close edit form' : 'Edit task'}
         >
           {isEditing ? 'Close' : 'Edit'}

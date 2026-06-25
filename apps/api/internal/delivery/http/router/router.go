@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"react-todos/apps/api/internal/infrastructure/config"
 	"react-todos/apps/api/internal/delivery/http/handlers"
 	appMiddleware "react-todos/apps/api/internal/delivery/http/middleware"
 	"react-todos/apps/api/internal/domain/services"
+	"react-todos/apps/api/internal/infrastructure/config"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -37,11 +37,11 @@ func SetupRouter(
 	r := chi.NewRouter()
 
 	// ===== GLOBAL MIDDLEWARE =====
-	r.Use(appMiddleware.CORS(cfg.FrontendURL))
+	r.Use(appMiddleware.CORS(cfg.Env, cfg.FrontendURL))
 	r.Use(appMiddleware.ErrorHandler)
 	r.Use(appMiddleware.StructuredLogger(slog.Default()))
 	r.Use(middleware.Recoverer)
-	r.Use(appMiddleware.SecurityHeaders)
+	r.Use(appMiddleware.SecurityHeaders(cfg.Env))
 
 	// ===== HEALTH (Public) =====
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {

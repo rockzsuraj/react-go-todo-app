@@ -3,12 +3,12 @@ import NewTodoForm from '../components/NewTodoForm';
 import TodoTable from '../components/TodoTable';
 import { Spinner } from '../components/ui';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { useTodoSSE } from '../hooks/useTodoSSE';
 import {
   useDeleteTodo,
   useTodos,
   useToggleTodoCompleted,
 } from '../hooks/useTodos';
-import { useTodoSSE } from '../hooks/useTodoSSE';
 
 export default function Home() {
   usePageTitle('Home');
