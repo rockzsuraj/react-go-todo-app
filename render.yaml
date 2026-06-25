@@ -5,7 +5,6 @@ services:
     runtime: docker
     dockerfilePath: ./apps/api/backend.Dockerfile
     dockerContext: ./apps/api
-    dockerCommand: production   # selects the "production" build target
     region: singapore           # change to your preferred region
     plan: starter               # upgrade to standard for always-on
     healthCheckPath: /ready
@@ -41,17 +40,18 @@ services:
     runtime: docker
     dockerfilePath: ./apps/web/frontend.Dockerfile
     dockerContext: ./apps/web
-    dockerCommand: production
     region: singapore
     plan: starter
     healthCheckPath: /health
     autoDeploy: true
 
     envVars:
-      - key: API_BACKEND_URL
-        # Internal Render private network URL — no public egress, near-zero latency.
-        # Format: https://<service-name>.onrender.com  (or use private service URL)
-        sync: false             # set to your todos-api Render URL
+      - key: API_BACKEND_HOSTPORT
+        # Internal Render private network host:port for nginx proxying.
+        fromService:
+          type: web
+          name: todos-api
+          property: hostport
       - key: REACT_APP_API_URL
         sync: false             # public API URL seen by the browser
       - key: REACT_APP_FRONTEND_URL

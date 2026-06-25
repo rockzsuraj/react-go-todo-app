@@ -53,7 +53,7 @@ FROM nginx:alpine AS production
 RUN apk add --no-cache gettext
 
 COPY --from=builder /app/build /usr/share/nginx/html
-# Store the template — entrypoint will substitute ${API_BACKEND_URL} at runtime
+# Store the template — entrypoint will substitute ${API_BACKEND_HOSTPORT} at runtime
 COPY nginx.conf /etc/nginx/nginx.conf.template
 
 EXPOSE 80
@@ -63,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
 
 # Substitute env vars into nginx config, then start nginx
-CMD ["/bin/sh", "-c", "envsubst '${API_BACKEND_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", ": \"${API_BACKEND_HOSTPORT:?API_BACKEND_HOSTPORT is required}\" && envsubst '${API_BACKEND_HOSTPORT}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
