@@ -52,6 +52,8 @@ services:
           type: web
           name: todos-api
           property: hostport
+      - key: API_BACKEND_URL
+        sync: false             # optional fallback for non-blueprint/manual deploys
       - key: REACT_APP_API_URL
         sync: false             # public API URL seen by the browser
       - key: REACT_APP_FRONTEND_URL
