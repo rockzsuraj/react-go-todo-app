@@ -49,8 +49,12 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine AS production
 
+# envsubst is included in gettext; needed to template nginx.conf at startup
+RUN apk add --no-cache gettext
+
 COPY --from=builder /app/build /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/nginx.conf
+# Store the template — entrypoint will substitute ${API_BACKEND_URL} at runtime
+COPY nginx.conf /etc/nginx/nginx.conf.template
 
 EXPOSE 80
 
@@ -58,4 +62,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+# Substitute env vars into nginx config, then start nginx
+CMD ["/bin/sh", "-c", "envsubst '${API_BACKEND_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]

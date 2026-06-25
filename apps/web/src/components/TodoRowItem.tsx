@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Todo } from '../types/todo';
 import UpdateTodoForm from './UpdateTodoForm';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
 
 interface Props {
   todo: Todo;
@@ -37,11 +39,9 @@ function TodoRowItem({
 
         <div className="todo-item-content">
           <div className="todo-item-topline">
-            <span
-              className={`todo-status ${todo.completed ? 'is-done' : 'is-active'}`}
-            >
+            <Badge variant={todo.completed ? 'success' : 'info'}>
               {todo.completed ? 'Completed' : 'Active'}
-            </span>
+            </Badge>
             <time dateTime={todo.created_at}>
               <i className="bi bi-calendar3" />
               {new Date(todo.created_at).toLocaleDateString(undefined, {
@@ -62,28 +62,26 @@ function TodoRowItem({
       </div>
 
       <div className="todo-item-actions">
-        <button
-          type="button"
-          className="todo-icon-action"
+        <Button
+          variant="secondary"
+          size="sm"
           disabled={isDeleting}
           onClick={() => setIsEditing((v) => !v)}
+          leftIcon={<i className={`bi ${isEditing ? 'bi-x-lg' : 'bi-pencil'}`} />}
           aria-label={isEditing ? 'Close edit form' : 'Edit task'}
         >
-          <i className={`bi ${isEditing ? 'bi-x-lg' : 'bi-pencil'}`} />
-          <span>{isEditing ? 'Close' : 'Edit'}</span>
-        </button>
-        <button
-          type="button"
+          {isEditing ? 'Close' : 'Edit'}
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
           onClick={deleteTodo}
-          className="todo-icon-action todo-icon-action--danger"
-          disabled={isDeleting}
+          isLoading={isDeleting}
+          leftIcon={<i className="bi bi-trash3" />}
           aria-label="Delete task"
         >
-          <i
-            className={`bi ${isDeleting ? 'bi-hourglass-split' : 'bi-trash3'}`}
-          />
-          <span>Delete</span>
-        </button>
+          Delete
+        </Button>
       </div>
 
       {isEditing && (

@@ -7,14 +7,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"react-todos/apps/api/internal/config"
-	"react-todos/apps/api/internal/db"
-	"react-todos/apps/api/internal/handlers"
-	"react-todos/apps/api/internal/repository"
-	"react-todos/apps/api/internal/routes"
-	"react-todos/apps/api/internal/services"
 	"syscall"
 	"time"
+
+	"react-todos/apps/api/internal/delivery/http/handlers"
+	appMiddleware "react-todos/apps/api/internal/delivery/http/middleware"
+	"react-todos/apps/api/internal/delivery/http/router"
+	"react-todos/apps/api/internal/infrastructure/config"
+	"react-todos/apps/api/internal/infrastructure/db"
+	"react-todos/apps/api/internal/infrastructure/events"
+	"react-todos/apps/api/internal/infrastructure/repository"
+	authUsecase "react-todos/apps/api/internal/usecase/auth"
+	todoUsecase "react-todos/apps/api/internal/usecase/todo"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -26,6 +32,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	// Load config once — handler structs receive it as a value, never re-read env.
 	dbCfg := config.LoadDBConfig()
 	appCfg := config.LoadAppConfig()
 	if err := config.ValidateProductionConfig(appCfg, dbCfg); err != nil {
@@ -42,36 +49,61 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize Redis with connection pool
+	var redisClient *redis.Client
+	if appCfg.RedisAddr != "" {
+		var err error
+		redisClient, err = db.NewRedisClient(appCfg.RedisAddr)
+		if err != nil {
+			logger.Warn("running without Redis cache, falling back to local/in-memory", "error", err)
+		} else {
+			defer redisClient.Close()
+		}
+	}
+
 	// Repositories
 	todoRepo := repository.NewTodoRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
 	oauthStateRepo := repository.NewOAuthStateRepository(database)
-	blacklistRepo := repository.NewPostgresBlacklistRepository(database)
+	blacklistRepo := repository.NewCachedBlacklistRepository(database, redisClient)
+
+	// Broadcaster/PubSub for real-time events
+	broadcaster := events.NewBroadcaster()
 
 	// Services
-	todoService := services.NewTodoService(todoRepo)
-	authService := services.NewAuthService(userRepo, refreshTokenRepo, blacklistRepo)
+	todoService := todoUsecase.NewTodoService(todoRepo, broadcaster)
+	authService := authUsecase.NewAuthService(userRepo, refreshTokenRepo, blacklistRepo)
 
-	// Handlers
-	handlers.InitHandlers(todoService)
-	handlers.InitAuthHandlers(authService, oauthStateRepo)
-	handlers.InitAdminHandlers(authService)
+	// Handlers — constructed with all dependencies at startup.
+	// No Init* functions, no package-level globals, no per-request config reads.
+	authHandler := handlers.NewAuthHandler(authService, appCfg, oauthStateRepo)
+	todoHandler := handlers.NewTodoHandler(todoService)
+	sseHandler := handlers.NewSSEHandler(broadcaster)
+	adminHandler := handlers.NewAdminHandler(authService)
+
+	// Rate Limiter
+	rateLimiter := appMiddleware.NewRateLimiter(redisClient)
 
 	// Router
 	readinessCheck := func(ctx context.Context) error {
 		if err := database.Ping(ctx); err != nil {
 			return fmt.Errorf("postgres: %w", err)
 		}
+		if redisClient != nil {
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				return fmt.Errorf("redis: %w", err)
+			}
+		}
 		return nil
 	}
-	router := routes.SetupRouter(authService, readinessCheck)
+	router := router.SetupRouter(appCfg, authService, authHandler, todoHandler, sseHandler, adminHandler, rateLimiter, readinessCheck)
 
 	server := &http.Server{
 		Addr:         ":" + port,
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0, // Bypassed for SSE connections
 		IdleTimeout:  60 * time.Second,
 	}
 

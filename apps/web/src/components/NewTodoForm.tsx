@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useCreateTodo } from '../hooks/useTodos';
+import { Input } from './ui/Input';
+import { TextArea } from './ui/TextArea';
+import { Button } from './ui/Button';
 
 function NewTodoForm({ onSuccess }: { onSuccess?: () => void }) {
   const [description, setDescription] = useState('');
@@ -31,27 +34,22 @@ function NewTodoForm({ onSuccess }: { onSuccess?: () => void }) {
     <form className="todo-form" onSubmit={handleSubmit}>
       <div className="todo-form-grid">
         <div className="todo-form-field">
-          <label htmlFor="assigned">
-            <i className="bi bi-person" />
-            Assigned to
-          </label>
-          <input
+          <Input
             id="assigned"
+            label="Assigned to"
             type="text"
             value={assignedToName}
             required
             onChange={(e) => setAssignedToName(e.target.value)}
             placeholder="e.g. Mom, Dad, John"
+            leftIcon={<i className="bi bi-person" />}
           />
         </div>
 
         <div className="todo-form-field todo-form-field--wide">
-          <label htmlFor="description">
-            <i className="bi bi-text-left" />
-            Task details
-          </label>
-          <textarea
+          <TextArea
             id="description"
+            label="Task details"
             rows={3}
             value={description}
             required
@@ -62,14 +60,13 @@ function NewTodoForm({ onSuccess }: { onSuccess?: () => void }) {
       </div>
 
       <div className="todo-form-actions">
-        <button
+        <Button
           type="submit"
-          className="todo-primary-action"
-          disabled={createTodoMutation.isPending}
+          isLoading={createTodoMutation.isPending}
+          leftIcon={<i className="bi bi-plus-lg" />}
         >
-          <i className="bi bi-plus-lg" />
-          {createTodoMutation.isPending ? 'Adding...' : 'Add task'}
-        </button>
+          Add task
+        </Button>
       </div>
     </form>
   );

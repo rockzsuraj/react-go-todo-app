@@ -1,0 +1,107 @@
+.ui-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.ui-input-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ui-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ui-input {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(203, 213, 225, 0.7);
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-sizing: border-box;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ui-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+  background-color: #ffffff;
+  outline: none;
+}
+
+.ui-input:disabled {
+  background-color: #f1f5f9;
+  border-color: #e2e3e8;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* --- Input with Icons --- */
+.ui-input-icon {
+  position: absolute;
+  color: #94a3b8;
+  font-size: 1rem;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.25s ease;
+}
+
+.ui-input-icon--left {
+  left: 14px;
+}
+
+.ui-input-icon--right {
+  right: 14px;
+}
+
+.ui-input--has-left {
+  padding-left: 42px;
+}
+
+.ui-input--has-right {
+  padding-right: 42px;
+}
+
+.ui-input:focus + .ui-input-icon {
+  color: #6366f1;
+}
+
+/* --- Error State --- */
+.ui-input-wrapper--error .ui-input {
+  border-color: #ef4444;
+}
+
+.ui-input-wrapper--error .ui-input:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+
+.ui-input-error {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  animation: ui-input-shake 0.3s ease;
+}
+
+@keyframes ui-input-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}

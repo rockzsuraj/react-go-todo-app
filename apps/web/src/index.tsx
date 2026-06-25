@@ -3,7 +3,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-
+import ToastContainer from './components/ToastContainer';
+import { ToastProvider } from './context/ToastContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,7 +28,11 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <ToastProvider>
+        <App />
+        {/* ToastContainer lives outside the router so toasts survive navigation */}
+        <ToastContainer />
+      </ToastProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );

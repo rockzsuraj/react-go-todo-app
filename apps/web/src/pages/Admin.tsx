@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useRevokeUser, useUnblockUser } from '../hooks/useAdmin';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
 import { APIErrorHandler } from '../utils/errorHandler';
 
 export default function Admin() {
   const { data: user } = useAuth();
+  const { showToast } = useToast();
   const [userID, setUserID] = useState('');
   const revokeUserMutation = useRevokeUser();
   const unblockUserMutation = useUnblockUser();
@@ -14,7 +16,6 @@ export default function Admin() {
     return <Navigate to="/login" replace />;
   }
 
-  // Simple role check; adjust if your user object has a role field
   if (user.role !== 'admin') {
     return (
       <div className="container mt-5 text-danger">
@@ -30,14 +31,14 @@ export default function Admin() {
       {
         onSuccess: () => {
           setUserID('');
-          alert('User revoked successfully');
+          showToast('User revoked successfully.', 'success', 'Revoked');
         },
         onError: (err: unknown) => {
           const apiError = APIErrorHandler.getError(err);
           const message = apiError
             ? APIErrorHandler.getUserFriendlyMessage(apiError)
             : 'Failed to revoke user';
-          alert(message);
+          showToast(message, 'error', 'Revoke failed');
         },
       },
     );
@@ -50,14 +51,14 @@ export default function Admin() {
       {
         onSuccess: () => {
           setUserID('');
-          alert('User unblocked successfully');
+          showToast('User unblocked successfully.', 'success', 'Unblocked');
         },
         onError: (err: unknown) => {
           const apiError = APIErrorHandler.getError(err);
           const message = apiError
             ? APIErrorHandler.getUserFriendlyMessage(apiError)
             : 'Failed to unblock user';
-          alert(message);
+          showToast(message, 'error', 'Unblock failed');
         },
       },
     );

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useUpdateTodo } from '../hooks/useTodos';
 import type { TodoEditable } from '../types/todo';
+import { Button, Input, TextArea } from './ui';
 
 interface Props {
   todo: TodoEditable;
@@ -11,14 +12,6 @@ function UpdateTodoForm({ todo, onCancel }: Props) {
   const [description, setDescription] = useState(todo.description);
   const [assigned, setAssigned] = useState(todo.assigned_to_name);
   const updateTodoMutation = useUpdateTodo();
-
-  function handleChangeDescription(event: { target: { value: string } }) {
-    setDescription(event.target.value);
-  }
-
-  function handleChangeAssigned(event: { target: { value: string } }) {
-    setAssigned(event.target.value);
-  }
 
   function submitUpdate() {
     if (description !== '' && assigned !== '') {
@@ -44,48 +37,43 @@ function UpdateTodoForm({ todo, onCancel }: Props) {
     <div className="todo-edit-form">
       <div className="todo-form-grid">
         <div className="todo-form-field">
-          <label htmlFor="update-assigned">
-            <i className="bi bi-person" />
-            Assigned to
-          </label>
-          <input
+          <Input
             id="update-assigned"
+            label="Assigned to"
             value={assigned}
             type="text"
             required
-            onChange={handleChangeAssigned}
+            leftIcon={<i className="bi bi-person" />}
+            onChange={(e) => setAssigned(e.target.value)}
           />
         </div>
         <div className="todo-form-field todo-form-field--wide">
-          <label htmlFor="update-description">
-            <i className="bi bi-text-left" />
-            Task details
-          </label>
-          <textarea
+          <TextArea
             id="update-description"
+            label="Task details"
             value={description}
             rows={3}
             required
-            onChange={handleChangeDescription}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </div>
       </div>
       <div className="todo-form-actions">
-        <button
+        <Button
           onClick={submitUpdate}
           type="button"
-          className="todo-save-action"
-          disabled={updateTodoMutation.isPending}
+          isLoading={updateTodoMutation.isPending}
+          leftIcon={<i className="bi bi-check2" />}
         >
-          <i className="bi bi-check2" />
-          {updateTodoMutation.isPending ? 'Saving...' : 'Save changes'}
-        </button>
-        <button onClick={onCancel} type="button" className="todo-cancel-action">
+          Save changes
+        </Button>
+        <Button onClick={onCancel} type="button" variant="secondary">
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
 export default UpdateTodoForm;
+

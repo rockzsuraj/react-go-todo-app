@@ -1,0 +1,66 @@
+services:
+  # ── Backend API ────────────────────────────────────────────────────────────
+  - type: web
+    name: todos-api
+    runtime: docker
+    dockerfilePath: ./apps/api/backend.Dockerfile
+    dockerContext: ./apps/api
+    dockerCommand: production   # selects the "production" build target
+    region: singapore           # change to your preferred region
+    plan: starter               # upgrade to standard for always-on
+    healthCheckPath: /ready
+    autoDeploy: true
+
+    envVars:
+      - key: ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: todos-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false             # set manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true     # Render generates a cryptographically random value
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URL
+        sync: false             # e.g. https://todos-api.onrender.com/api/auth/callback/google
+      - key: FRONTEND_URL
+        sync: false             # e.g. https://todos-web.onrender.com
+      - key: MOBILE_REDIRECT_URI
+        sync: false             # e.g. todoapp://oauth/callback
+
+  # ── Frontend Web ───────────────────────────────────────────────────────────
+  - type: web
+    name: todos-web
+    runtime: docker
+    dockerfilePath: ./apps/web/frontend.Dockerfile
+    dockerContext: ./apps/web
+    dockerCommand: production
+    region: singapore
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+
+    envVars:
+      - key: API_BACKEND_URL
+        # Internal Render private network URL — no public egress, near-zero latency.
+        # Format: https://<service-name>.onrender.com  (or use private service URL)
+        sync: false             # set to your todos-api Render URL
+      - key: REACT_APP_API_URL
+        sync: false             # public API URL seen by the browser
+      - key: REACT_APP_FRONTEND_URL
+        sync: false             # public frontend URL
+
+# ── Managed PostgreSQL ─────────────────────────────────────────────────────
+databases:
+  - name: todos-db
+    databaseName: todos
+    user: todos_user
+    region: singapore
+    plan: starter               # upgrade to standard for daily backups + HA

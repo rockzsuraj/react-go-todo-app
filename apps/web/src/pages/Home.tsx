@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import NewTodoForm from '../components/NewTodoForm';
 import TodoTable from '../components/TodoTable';
+import { Spinner } from '../components/ui';
 import { usePageTitle } from '../hooks/usePageTitle';
 import {
   useDeleteTodo,
   useTodos,
   useToggleTodoCompleted,
 } from '../hooks/useTodos';
+import { useTodoSSE } from '../hooks/useTodoSSE';
 
 export default function Home() {
   usePageTitle('Home');
+  useTodoSSE();
   const [showAddTodoForm, setShowAddTodoForm] = useState(false);
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
@@ -110,7 +113,7 @@ export default function Home() {
     return (
       <div className="todo-page-shell">
         <div className="todo-loading-state">
-          <span className="spinner-border text-primary" aria-hidden="true" />
+          <Spinner size="md" variant="primary" />
           <span>Loading your tasks...</span>
         </div>
       </div>

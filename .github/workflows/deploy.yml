@@ -1,0 +1,52 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main]
+
+# Only one deploy at a time; cancel in-flight runs if a new commit lands.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Trigger Render deploy
+    runs-on: ubuntu-latest
+    environment: production   # requires manual approval in GitHub Environments (optional)
+
+    steps:
+      - name: Deploy API service
+        run: |
+          curl --silent --show-error --fail \
+            --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_API_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+      - name: Deploy Web service
+        run: |
+          curl --silent --show-error --fail \
+            --request POST \
+            --url "https://api.render.com/v1/services/${{ secrets.RENDER_WEB_SERVICE_ID }}/deploys" \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache": "do_not_clear"}'
+
+      - name: Wait for API to go live
+        # Poll /ready until it returns 200 or we time out after 5 minutes.
+        run: |
+          echo "Waiting for API readiness..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+              "${{ secrets.RENDER_API_URL }}/ready" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "API is ready (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i: status=$STATUS — retrying in 10s"
+            sleep 10
+          done
+          echo "API did not become ready in time"
+          exit 1

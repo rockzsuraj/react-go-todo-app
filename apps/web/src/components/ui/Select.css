@@ -1,0 +1,98 @@
+.ui-select-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.ui-select-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ui-select-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ui-select {
+  width: 100%;
+  padding: 10px 40px 10px 16px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(203, 213, 225, 0.7);
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.ui-select:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+  background-color: #ffffff;
+  outline: none;
+}
+
+.ui-select:disabled {
+  background-color: #f1f5f9;
+  border-color: #e2e3e8;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* --- Select with Left Icon --- */
+.ui-select-icon {
+  position: absolute;
+  color: #94a3b8;
+  font-size: 1rem;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.25s ease;
+}
+
+.ui-select-icon--left {
+  left: 14px;
+}
+
+.ui-select--has-left {
+  padding-left: 42px;
+}
+
+.ui-select:focus + .ui-select-icon {
+  color: #6366f1;
+}
+
+/* --- Error State --- */
+.ui-select-wrapper--error .ui-select {
+  border-color: #ef4444;
+}
+
+.ui-select-wrapper--error .ui-select:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+
+.ui-select-error {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

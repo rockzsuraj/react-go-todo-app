@@ -95,9 +95,9 @@ function ErrorIcon({ type }: { type: 'lock' | 'clock' | 'shield' | 'alert' }) {
 
 export default function LoginCard({ errorCode, errorMessage }: LoginCardProps) {
   const [showError, setShowError] = useState(false);
-  const loginUrl = `/api/auth/google/login?redirect=${encodeURIComponent(
-    `${window.location.origin}/oauth/callback`,
-  )}`;
+  // The backend OAuth redirect URL is fixed in server config (GOOGLE_REDIRECT_URL env var).
+  // The frontend simply navigates to the login endpoint; no redirect param is needed or read.
+  const loginUrl = '/api/auth/google/login';
 
   const meta = errorMeta(errorCode);
 

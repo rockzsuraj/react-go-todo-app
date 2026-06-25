@@ -1,5 +1,6 @@
 import type { Todo } from '../types/todo';
 import TodoRowItem from './TodoRowItem';
+import { EmptyState } from './ui';
 
 interface Props {
   todos: Todo[];
@@ -16,17 +17,15 @@ function TodoTable({
 }: Props) {
   if (todos.length === 0) {
     return (
-      <div className="todo-empty-state">
-        <span className="todo-empty-icon">
-          <i className="bi bi-check2-circle" />
-        </span>
-        <h3>No tasks found</h3>
-        <p>
-          {isDeleting
+      <EmptyState
+        icon="bi-collection"
+        title="No tasks found"
+        description={
+          isDeleting
             ? 'Deleting...'
-            : 'Try another filter or add a new task to get started.'}
-        </p>
-      </div>
+            : 'Try a different filter, or add a new task to get started.'
+        }
+      />
     );
   }
 
@@ -46,3 +45,4 @@ function TodoTable({
 }
 
 export default TodoTable;
+

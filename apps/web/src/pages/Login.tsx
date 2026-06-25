@@ -2,6 +2,7 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import LoginCard from '../components/LoginCard';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { Spinner } from '../components/ui';
 
 export default function Login() {
   usePageTitle('Login');
@@ -13,8 +14,15 @@ export default function Login() {
 
   if (isLoading) {
     return (
-      <div className="container mt-5 text-center">
-        Checking authentication...
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <Spinner size="lg" variant="primary" />
       </div>
     );
   }
@@ -25,3 +33,4 @@ export default function Login() {
 
   return <LoginCard errorCode={errorCode} errorMessage={errorMessage} />;
 }
+

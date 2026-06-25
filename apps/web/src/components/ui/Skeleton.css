@@ -1,0 +1,34 @@
+.ui-skeleton {
+  background-color: rgba(226, 232, 240, 0.7);
+  display: block;
+  animation: ui-skeleton-shimmer 1.5s ease-in-out infinite;
+  box-sizing: border-box;
+}
+
+/* --- Variants --- */
+.ui-skeleton--text {
+  height: 1em;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  border-radius: 4px;
+}
+
+.ui-skeleton--rect {
+  border-radius: 12px;
+}
+
+.ui-skeleton--circle {
+  border-radius: 50%;
+}
+
+@keyframes ui-skeleton-shimmer {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
